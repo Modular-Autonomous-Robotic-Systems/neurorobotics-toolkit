@@ -1,0 +1,13 @@
+stereo/left/left_camera:
+  ros__parameters:
+    camera: 0
+    width: 640
+    height: 480
+    format: RGB888
+
+stereo/right/right_camera:
+  ros__parameters:
+    camera: 1
+    width: 640
+    height: 480
+    format: RGB888
