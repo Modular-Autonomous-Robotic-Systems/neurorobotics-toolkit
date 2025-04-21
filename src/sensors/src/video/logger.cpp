@@ -1,7 +1,6 @@
 #include "sensors/video/logger.h"
 
-VideoLogger::VideoLogger(rclcpp::Logger logger, std::string &outputPath, VideoProperties &props):
-mpLogger(logger){ 
+VideoLogger::VideoLogger(std::shared_ptr<VideoLoggerNode> nh, std::string &outputPath, VideoProperties &props): mpNodeHandle(nh), mpLogger(nh->get_logger()){ 
     mpOutputFilePath = outputPath;
     mpOutputImageWidth = props.mWidth;
     mpOutputImageHeight = props.mHeight;
@@ -85,8 +84,8 @@ mpLogger(logger){
 
     mpVideoLoggerStatus = 1;
 
-    cv::namedWindow("Video Logger Output", cv::WINDOW_AUTOSIZE);
-    RCLCPP_INFO(mpLogger, "Display window initialized");
+    // cv::namedWindow("Video Logger Output", cv::WINDOW_AUTOSIZE);
+    // RCLCPP_INFO(mpLogger, "Display window initialized");
 }
 
 // Set the pipeline to playing state to start receivving frames
@@ -179,11 +178,11 @@ VideoLogger::~VideoLogger() {
     gst_element_set_state(mpPipeline, GST_STATE_NULL);
     gst_object_unref(mpPipeline);
 	
-	cv::destroyWindow("Video Logger Output");
+	// cv::destroyWindow("Video Logger Output");
 }
 
 // TODO: Save the video file without mismatched timings
-void VideoLogger::logFrame(cv::Mat &image) {
+void VideoLogger::logFrame(cv::Mat &image, uint64 timestamp) {
     if (image.empty()) {
         RCLCPP_WARN(mpLogger, "Received empty image frame");
         return;
@@ -211,9 +210,10 @@ void VideoLogger::logFrame(cv::Mat &image) {
     gst_buffer_unmap(buf, &map);
 
     // Set accurate buffer timestamp
-    GstClockTime time = gst_util_uint64_scale_int(mpFrameCounter, GST_SECOND, mpInputDataFPS);
-    GST_BUFFER_PTS(buf) = time;
-    GST_BUFFER_DTS(buf) = time;
+    // GstClockTime time = gst_util_uint64_scale_int(mpFrameCounter, GST_SECOND, mpInputDataFPS);
+	GstClockTime t = timestamp;
+    GST_BUFFER_PTS(buf) = t;
+    // GST_BUFFER_DTS(buf) = t;
     GST_BUFFER_DURATION(buf) = gst_util_uint64_scale_int(1, GST_SECOND, mpInputDataFPS);
     
     // Push buffer to pipeline
@@ -227,12 +227,12 @@ void VideoLogger::logFrame(cv::Mat &image) {
     }
 
     // Display the frames
-    try {
-        cv::imshow("Video Logger Output", image);
-        cv::waitKey(1);  
-    } catch (const cv::Exception& e) {
-        RCLCPP_WARN_ONCE(mpLogger, "Display error: %s", e.what());
-    }
+    // try {
+    //     cv::imshow("Video Logger Output", image);
+    //     cv::waitKey(1);  
+    // } catch (const cv::Exception& e) {
+    //     RCLCPP_WARN_ONCE(mpLogger, "Display error: %s", e.what());
+    // }
 
     mpFrameCounter++;
 }
@@ -290,8 +290,9 @@ CallbackReturn VideoLoggerNode::on_configure(const rclcpp_lifecycle::State &){
 	props.mHeight = mpOutputImageHeight;
 	props.mNumChannels = mpNumChannels;
 	props.mFPS = mpInputDataFPS;
-
-	mpVideoLogger = std::make_unique<VideoLogger>(this->get_logger(), mpOutputFilePath, props);
+	
+	std::shared_ptr<VideoLoggerNode> this_shrd = std::shared_ptr<VideoLoggerNode>(this);
+	mpVideoLogger = std::make_unique<VideoLogger>(this_shrd, mpOutputFilePath, props);
 
 	mpFrameSubscriber = this->create_subscription<sensor_msgs::msg::Image>(
 		mpTopicName.c_str(),
@@ -330,9 +331,6 @@ CallbackReturn VideoLoggerNode::on_deactivate(const rclcpp_lifecycle::State &){
         if (mpFrameSubscriber) {
             mpFrameSubscriber.reset();
         }
-        if (mpVideoLogger) {
-            mpVideoLogger->stop();
-        }
         RCLCPP_INFO(this->get_logger(), "Video logger node deactivated");
         return CallbackReturn::SUCCESS;
     } catch (const std::exception& e) {
@@ -369,7 +367,7 @@ CallbackReturn VideoLoggerNode::on_shutdown(const rclcpp_lifecycle::State &){
 void VideoLoggerNode::frameCallback(const sensor_msgs::msg::Image::ConstSharedPtr &img) {
     try {
         cv_bridge::CvImagePtr cv_ptr_img = cv_bridge::toCvCopy(img, img->encoding);
-        
+       	uint64 timestamp = img->header.stamp.sec * 1e9 + img->header.stamp.nanosec; 
         if (!mpVideoLogger) {
             RCLCPP_ERROR(this->get_logger(), "Video logger not initialized");
             return;
@@ -384,7 +382,7 @@ void VideoLoggerNode::frameCallback(const sensor_msgs::msg::Image::ConstSharedPt
                 cv::resize(cv_ptr_img->image, image, 
                           cv::Size(mpOutputImageWidth, mpOutputImageHeight));
             }
-            mpVideoLogger->logFrame(image);
+            mpVideoLogger->logFrame(image, timestamp);
         }
     } catch (const cv::Exception& e) {
         RCLCPP_ERROR(this->get_logger(), "CV error in callback: %s", e.what());

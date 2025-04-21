@@ -1,7 +1,7 @@
 #include "sensors/video/reader.h"
 
-VideoReader::VideoReader(rclcpp::Logger logger, const std::string& mpInputFilePath, std::function<void(std::shared_ptr<Frame>)> cb):
-mpLogger(logger), mpInputFilePath(mpInputFilePath), mpFrameCallback(cb), mpPipeline(nullptr),
+VideoReader::VideoReader(std::shared_ptr<VideoReaderNode> nh, const std::string& mpInputFilePath, std::function<void(std::shared_ptr<Frame>)> cb):
+mpNodeHandle(nh), mpLogger(nh->get_logger()), mpInputFilePath(mpInputFilePath), mpFrameCallback(cb), mpPipeline(nullptr),
 mpFilesrc(nullptr), mpDemuxer(nullptr), mpQueue(nullptr), mpH264Parser(nullptr),
 mpH264Decoder(nullptr), mpVideoconvert(nullptr), mpCapsfilter(nullptr), mpAppsink(nullptr),
 loop(nullptr) {
@@ -99,13 +99,17 @@ GstFlowReturn VideoReader::new_sample(GstAppSink *sink, gpointer user_data) {
             GstMapInfo map;
             if (gst_buffer_map(buffer, &map, GST_MAP_READ)) {
                 GstClockTime timestamp = GST_BUFFER_PTS(buffer);
-                double timestamp_seconds = (double)timestamp / GST_SECOND;
 
                 cv::Mat frame(cv::Size(1920, 1080), CV_8UC3, (void*)map.data, cv::Mat::AUTO_STEP);
                 std::shared_ptr<Frame> f = std::make_shared<Frame>();
-                f->frame = frame.clone();
-                f->timestamp = timestamp_seconds;
-                reader->frameCallback(f);
+				if(!frame.empty()){
+					f->frame = frame.clone();
+					f->timestamp = timestamp;
+					reader->frameCallback(f);
+				}
+				else{
+					RCLCPP_ERROR(reader->mpLogger, "Received empty frame");
+				}
 
                 gst_buffer_unmap(buffer, &map);
             }
@@ -202,7 +206,8 @@ CallbackReturn VideoReaderNode::on_activate(const rclcpp_lifecycle::State &){
         std::function<void(std::shared_ptr<Frame>)> fcb = [this](std::shared_ptr<Frame> frame){
             frameCallback(frame);
         };
-        mpReader = std::make_shared<VideoReader>(this->get_logger(), mpInputFilePath, fcb);
+		std::shared_ptr<VideoReaderNode> this_shrd = std::shared_ptr<VideoReaderNode>(this);
+        mpReader = std::make_shared<VideoReader>(this_shrd, mpInputFilePath, fcb);
         RCLCPP_INFO(this->get_logger(), "Running the pipeline...");
         mpReader->run();
         RCLCPP_INFO(this->get_logger(), "Pipeline stopped");
@@ -238,7 +243,7 @@ void VideoReaderNode::frameCallback(std::shared_ptr<Frame> frame) {
         if(!frame->frame.empty()) {
             sensor_msgs::msg::Image img_msg;
             std_msgs::msg::Header header;
-            header.stamp = this->now();
+            header.stamp = rclcpp::Time(frame->timestamp);
 
             cv_bridge::CvImage(
                 header,

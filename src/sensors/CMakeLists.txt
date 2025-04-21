@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.14)
 project(sensors)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -22,11 +22,12 @@ find_package(lifecycle_msgs REQUIRED)
 # Command to check gstreamer dependencies
 pkg_check_modules(GST REQUIRED gstreamer-1.0 gstreamer-video-1.0  gstreamer-app-1.0)
 
-include_directories(include)
 link_directories( ${GST_LIBRARY_DIRS}  )
-include_directories( ${GST_INCLUDE_DIRS}  )
-
-include_directories(${OpenCV_INCLUDE_DIRS}) # include headers for opencv in all executables
+include_directories(
+	include
+	$<INSTALL_INTERFACE:include>
+	${OpenCV_INCLUDE_DIRS}
+	${GST_INCLUDE_DIRS}) # include headers for opencv in all executables
 
 set(THIS_PACKAGE_INCLUDE_DEPENDS
 	rclcpp

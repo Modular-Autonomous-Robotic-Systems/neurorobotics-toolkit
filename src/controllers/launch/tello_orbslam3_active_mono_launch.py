@@ -50,6 +50,30 @@ def generate_launch_description():
             arguments=['--ros-args', '--log-level', logger],
             output='screen'
         ),
+        
+        launch_ros.actions.Node(
+            package='sensors',
+            executable='video_logger_node',
+            output='screen',
+            namespace='/',
+            name='video_logger',
+            respawn=False,
+            prefix = ['gdb -batch -ex run -ex bt --args'],
+            arguments=['--ros-args', '--log-level', logger],
+            parameters = [{
+                'output_file_path': '/ws/data/output.mp4',
+                'width' : 640,
+                'height' : 480,
+                'fps' : 30,
+                'camera_topic' : '/camera',
+                'image_type' : 'bgr'
+            }],
+        ),
+
+        launch.actions.ExecuteProcess(
+            cmd=['ros2', 'bag', 'record', '-a'],
+            output='screen'
+        ),
 
         # OctoMap Builder Node
         launch.actions.IncludeLaunchDescription(

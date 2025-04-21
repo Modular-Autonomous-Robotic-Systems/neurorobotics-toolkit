@@ -1,17 +1,20 @@
 #include "sensors/video/common.h"
 #include <gst/app/gstappsrc.h>
 
+class VideoLoggerNode;
+
 class VideoLogger{
 	public:
-		VideoLogger(rclcpp::Logger logger, std::string &outputPath, VideoProperties &props);
+		VideoLogger(std::shared_ptr<VideoLoggerNode> nh, std::string &outputPath, VideoProperties &props);
 		~VideoLogger();
 		bool start();
 		void stop();
 		int getStatus(){return mpVideoLoggerStatus;}
-		void logFrame(cv::Mat &image);
+		void logFrame(cv::Mat &image, uint64 timestamp);
 
 	private:
 		rclcpp::Logger mpLogger;
+		std::shared_ptr<VideoLoggerNode> mpNodeHandle;
 
 		GstElement* mpPipeline;
 		GstElement* mpAppsrc;

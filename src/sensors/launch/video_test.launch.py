@@ -30,6 +30,7 @@ def generate_launch_description():
             name='video_reader',
             respawn=False,
             arguments=['--ros-args', '--log-level', logger],
+            prefix = ['gdb --ex run --ex bt --args'],
             parameters = [{
                 'camera_topic' : "/camera",
                 'input_file_path' : '/ws/data/test.mp4'

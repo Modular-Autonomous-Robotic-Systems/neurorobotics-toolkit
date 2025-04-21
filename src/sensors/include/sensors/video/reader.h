@@ -7,19 +7,22 @@
 struct Frame{
     public:
         cv::Mat frame;
-        double timestamp;
+        uint64 timestamp;
         std::string format;
         int height, width;
 };
 
+class VideoReaderNode;
+
 class VideoReader {
     public:
-        VideoReader(rclcpp::Logger logger, const std::string& inputFilePath, std::function<void(std::shared_ptr<Frame>)> cb);
+        VideoReader(std::shared_ptr<VideoReaderNode> nh, const std::string& inputFilePath, std::function<void(std::shared_ptr<Frame>)> cb);
         ~VideoReader();
         void run();
         void shutdown();
         void frameCallback(std::shared_ptr<Frame> frame);
     private:
+		std::shared_ptr<VideoReaderNode> mpNodeHandle;
         rclcpp::Logger mpLogger;
         std::string mpInputFilePath;
         std::function<void(std::shared_ptr<Frame>)> mpFrameCallback;
