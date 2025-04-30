@@ -40,7 +40,6 @@ class VideoLoggerNode: public rclcpp_lifecycle::LifecycleNode{
 	public:
 		VideoLoggerNode();
 		void frameCallback(const sensor_msgs::msg::Image::ConstSharedPtr &img);
-		void lifecycleCallback(const lifecycle_msgs::msg::TransitionEvent::SharedPtr msg);
 
 		CallbackReturn on_configure(const rclcpp_lifecycle::State &);
 		CallbackReturn on_activate(const rclcpp_lifecycle::State &);
@@ -57,9 +56,11 @@ class VideoLoggerNode: public rclcpp_lifecycle::LifecycleNode{
 		int mpOutputImageHeight;
 		int mpInputDataFPS;
 		int mpNumChannels;
+		int mpFrameCount;
 
 		rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr mpFrameSubscriber;
 		rclcpp::Subscription<lifecycle_msgs::msg::TransitionEvent>::SharedPtr mpLifecycleSubscriber;
 
 		std::unique_ptr<VideoLogger> mpVideoLogger;
+		VideoProperties mpVideoProps;
 };

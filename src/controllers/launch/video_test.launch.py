@@ -6,6 +6,15 @@ def generate_launch_description():
     logger = launch.substitutions.LaunchConfiguration("log-level", default = logger_default)
     nodes = [
         launch_ros.actions.Node(
+            package="controllers",
+            executable="video_test_controller",
+            output="screen",
+            namespace="/",
+            name="test_controller",
+            respawn=False,
+            arguments=['--ros-args', '--log-level', logger]
+        ),
+        launch_ros.actions.Node(
             package='sensors',
             executable='video_logger_node',
             output='screen',

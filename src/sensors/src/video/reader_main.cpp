@@ -5,13 +5,9 @@ int main(int argc, char **argv) {
     auto node = std::make_shared<VideoReaderNode>();
     
     rclcpp::executors::SingleThreadedExecutor executor;
+	executor.add_node(node->get_node_base_interface());
 
-    // TODO: add executor and handle lifecycle controlled callback
-    node->configure();
-    node->activate();
-    node->deactivate();
-    node->cleanup();
-    node->shutdown();
+	executor.spin();
 
     rclcpp::shutdown();
     return 0;

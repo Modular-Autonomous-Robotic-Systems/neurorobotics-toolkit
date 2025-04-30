@@ -52,6 +52,7 @@ endif()
 ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
 	scripts/orbslam3_monocular_controller
+	scripts/video_test_controller
 	DESTINATION lib/${PROJECT_NAME}
 )
 

@@ -290,20 +290,13 @@ CallbackReturn VideoLoggerNode::on_configure(const rclcpp_lifecycle::State &){
 	props.mHeight = mpOutputImageHeight;
 	props.mNumChannels = mpNumChannels;
 	props.mFPS = mpInputDataFPS;
+	mpVideoProps = props;
 	
-	std::shared_ptr<VideoLoggerNode> this_shrd = std::shared_ptr<VideoLoggerNode>(this);
-	mpVideoLogger = std::make_unique<VideoLogger>(this_shrd, mpOutputFilePath, props);
-
 	mpFrameSubscriber = this->create_subscription<sensor_msgs::msg::Image>(
 		mpTopicName.c_str(),
 		10,
 		std::bind(&VideoLoggerNode::frameCallback, this, std::placeholders::_1)
 	);
-
-    mpLifecycleSubscriber = this->create_subscription<lifecycle_msgs::msg::TransitionEvent>(
-        "/video_reader/transition_event", 10,
-        std::bind(&VideoLoggerNode::lifecycleCallback, this, std::placeholders::_1)
-    );
 
 	RCLCPP_INFO(this->get_logger(), "Created Video Logger Node");
 	return CallbackReturn::SUCCESS;
@@ -311,6 +304,8 @@ CallbackReturn VideoLoggerNode::on_configure(const rclcpp_lifecycle::State &){
 
 CallbackReturn VideoLoggerNode::on_activate(const rclcpp_lifecycle::State &) {
     RCLCPP_INFO(this->get_logger(), "Starting Video Logger Node");
+	std::shared_ptr<VideoLoggerNode> this_shrd = std::shared_ptr<VideoLoggerNode>(this);
+	mpVideoLogger = std::make_unique<VideoLogger>(this_shrd, mpOutputFilePath, mpVideoProps);
     
     if (!mpVideoLogger) {
         RCLCPP_ERROR(this->get_logger(), "Video Logger instance not initialized");
@@ -328,9 +323,10 @@ CallbackReturn VideoLoggerNode::on_activate(const rclcpp_lifecycle::State &) {
 CallbackReturn VideoLoggerNode::on_deactivate(const rclcpp_lifecycle::State &){
     try {
         RCLCPP_INFO(this->get_logger(), "Deactivating video logger node");
-        if (mpFrameSubscriber) {
-            mpFrameSubscriber.reset();
-        }
+		if(mpVideoLogger){
+			mpVideoLogger->stop();
+			RCLCPP_INFO(this->get_logger(), "Stopped Video Logger Node and sent EOS to pipeline");
+		}
         RCLCPP_INFO(this->get_logger(), "Video logger node deactivated");
         return CallbackReturn::SUCCESS;
     } catch (const std::exception& e) {
@@ -341,15 +337,6 @@ CallbackReturn VideoLoggerNode::on_deactivate(const rclcpp_lifecycle::State &){
 
 CallbackReturn VideoLoggerNode::on_cleanup(const rclcpp_lifecycle::State &){
     try {
-        if (mpVideoLogger) {
-            mpVideoLogger.reset();
-        }
-        if (mpFrameSubscriber) {
-            mpFrameSubscriber.reset();
-        }
-        if (mpLifecycleSubscriber) {
-            mpLifecycleSubscriber.reset();
-        }
         RCLCPP_INFO(this->get_logger(), "Video logger node cleaned up");
         return CallbackReturn::SUCCESS;
     } catch (const std::exception& e) {
@@ -373,6 +360,11 @@ void VideoLoggerNode::frameCallback(const sensor_msgs::msg::Image::ConstSharedPt
             return;
         }
 
+		mpFrameCount++;
+		if(mpFrameCount % 500 == 0){
+			RCLCPP_INFO(this->get_logger(), "Received %d frames so far", mpFrameCount);
+		}
+
         if (!cv_ptr_img->image.empty()) {
             cv::Mat image;
             if (cv_ptr_img->image.rows == mpOutputImageHeight && 
@@ -388,20 +380,5 @@ void VideoLoggerNode::frameCallback(const sensor_msgs::msg::Image::ConstSharedPt
         RCLCPP_ERROR(this->get_logger(), "CV error in callback: %s", e.what());
     } catch (const std::exception& e) {
         RCLCPP_ERROR(this->get_logger(), "Error in callback: %s", e.what());
-    }
-}
-
-void VideoLoggerNode::lifecycleCallback(const lifecycle_msgs::msg::TransitionEvent::SharedPtr msg) {
-    const auto goal_state = msg->goal_state.id;
-    if (goal_state == lifecycle_msgs::msg::State::PRIMARY_STATE_FINALIZED) {
-        RCLCPP_INFO(this->get_logger(), "Video reader has finalized, following suit");
-        
-        // Use the lifecycle node's built-in state management
-        if (this->get_current_state().id() == lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE) {
-            this->deactivate();
-            this->cleanup();
-            this->shutdown();
-            rclcpp::shutdown();
-        }
     }
 }

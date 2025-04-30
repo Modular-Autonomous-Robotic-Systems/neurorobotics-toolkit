@@ -1,0 +1,19 @@
+#!/usr/bin/env python3
+
+from controllers.tests.video_test import VideoTestControllerNode
+import rclpy
+
+def main():
+    try:
+        rclpy.init()
+        test_driver = VideoTestControllerNode()
+        rclpy.spin(test_driver)
+        test_driver.destroy_node()
+        rclpy.shutdown()
+    except (KeyboardInterrupt, rclpy.executors.ExternalShutdownException):
+        rclpy.shutdown()
+
+
+
+if __name__ == '__main__':
+    main()
