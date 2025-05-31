@@ -15,6 +15,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(tello_msgs REQUIRED)
 find_package(lifecycle_msgs REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
+find_package(ardupilot_msgs REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -37,6 +38,15 @@ add_executable(tello_controller_node
 ament_target_dependencies(tello_controller_node
 	PUBLIC ${THIS_PACKAGE_INCLUDE_DEPENDS}
 )
+
+add_executable(video_logging_controller_node
+	src/logging/video_controller.cpp
+	src/common/controller.cpp
+)
+ament_target_dependencies(video_logging_controller_node
+	PUBLIC ${THIS_PACKAGE_INCLUDE_DEPENDS}
+	PUBLIC ardupilot_msgs
+)
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights
@@ -58,7 +68,9 @@ install(PROGRAMS
 install(TARGETS
 	DESTINATION "${PYTHON_INSTALL_DIR}/${PROJECT_NAME}"
 )
-install(TARGETS tello_controller_node
+install(TARGETS 
+	tello_controller_node
+	video_logging_controller_node
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION lib/${PROJECT_NAME}

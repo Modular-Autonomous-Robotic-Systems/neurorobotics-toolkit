@@ -84,9 +84,6 @@ mpLogger(logger){
     gst_caps_unref(caps);
 
     mpVideoLoggerStatus = 1;
-
-    cv::namedWindow("Video Logger Output", cv::WINDOW_AUTOSIZE);
-    RCLCPP_INFO(mpLogger, "Display window initialized");
 }
 
 // Set the pipeline to playing state to start receivving frames
@@ -224,14 +221,6 @@ void VideoLogger::logFrame(cv::Mat &image) {
             RCLCPP_ERROR(mpLogger, "Pipeline is flushing, might be in wrong state");
         }
         return;
-    }
-
-    // Display the frames
-    try {
-        cv::imshow("Video Logger Output", image);
-        cv::waitKey(1);  
-    } catch (const cv::Exception& e) {
-        RCLCPP_WARN_ONCE(mpLogger, "Display error: %s", e.what());
     }
 
     mpFrameCounter++;
