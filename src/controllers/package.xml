@@ -23,6 +23,8 @@
   <build_depend>tello_msgs</build_depend>
   <build_depend>lifecycle_msgs</build_depend>
   <build_depend>rclcpp_lifecycle</build_depend>
+  <!-- Ensure ardu_ws is sourced in the terminal -->
+  <build_depend>ardupilot_msgs</build_depend>
   
 
   <exec_depend>rclcpp</exec_depend>
@@ -34,6 +36,7 @@
   <exec_depend>tello_msgs</exec_depend>
   <exec_depend>lifecycle_msgs</exec_depend>
   <exec_depend>rclcpp_lifecycle</exec_depend>
+  <exec_depend>ardupilot_msgs</exec_depend>
 
   <exec_depend>ros2launch</exec_depend>
 

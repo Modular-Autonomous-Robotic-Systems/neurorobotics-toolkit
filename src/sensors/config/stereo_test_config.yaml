@@ -1,0 +1,15 @@
+stereo/left/left_camera:
+  ros__parameters:
+    camera: 0
+    width: 640
+    height: 480
+    format: RGB
+    camera_info_url: file:///absolute/path/to/left_camera_calibration.yaml
+
+stereo/right/right_camera:
+  ros__parameters:
+    camera: 1
+    width: 640
+    height: 480
+    format: RGB
+    camera_info_url: file:///absolute/path/to/right_camera_calibration.yaml
