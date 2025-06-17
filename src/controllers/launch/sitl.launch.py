@@ -1,68 +1,78 @@
 import os
-
-from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, TimerAction, LogInfo
-from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch_ros.substitutions import FindPackageShare
-from launch.substitutions import PathJoinSubstitution
+import launch
+import launch_ros
 
 def generate_launch_description():
-    delayed_launch = TimerAction(
+    log_level_arg = launch.actions.DeclareLaunchArgument(
+        "log_level",
+        default_value="INFO",
+        description="Logging level for the nodes (DEBUG, INFO, WARN, ERROR, FATAL)"
+    )
+    ap_status_topic_arg = launch.actions.DeclareLaunchArgument(
+        "ap_status_topic_name",
+        default_value="/ap/status", # Default AP status topic
+        description="Topic name for ArduPilot status messages."
+    )
+    # Get LaunchConfiguration values to be used by nodes
+    log_level = launch.substitutions.LaunchConfiguration("log_level")
+    ap_status_topic_name = launch.substitutions.LaunchConfiguration("ap_status_topic_name")
+
+    delayed_launch = launch.actions.TimerAction(
         period=3.0,  # Seconds
         actions=[
-            LogInfo(msg="Timer elapsed. Launching airsim_ros_pkgs node"),
+            launch.actions.LogInfo(msg="Timer elapsed. Launching airsim_ros_pkgs node"),
             # Action to launch airsim_ros_pkgs (defined below)
             # This will be added to the actions list of TimerAction
         ]
     )
     # --- AirSim Launch ---
     # Assuming workspace overlay of /airsim_ws
-    airsim_ros_pkg_path = FindPackageShare('airsim_ros_pkgs')
-    airsim_launch_file = PathJoinSubstitution([
+    airsim_ros_pkg_path = launch_ros.substitutions.FindPackageShare('airsim_ros_pkgs')
+    airsim_launch_file = launch.substitutions.PathJoinSubstitution([
         airsim_ros_pkg_path,
         'launch',
         'airsim_node.launch.py'
     ])
 
-    airsim_node_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(airsim_launch_file),
+    airsim_node_launch = launch.actions.IncludeLaunchDescription(
+        launch.launch_description_sources.PythonLaunchDescriptionSource(airsim_launch_file),
         launch_arguments={'host_ip': '127.0.0.1'}.items()
     )
     delayed_launch.actions.append(airsim_node_launch)
 
     # --- ArduPilot SITL Launch ---
     # Assuming workspace overlay of /ardupilot_ws
-    ardupilot_sitl_pkg_path = FindPackageShare('ardupilot_sitl')
-    ardupilot_launch_file = PathJoinSubstitution([
+    ardupilot_sitl_pkg_path = launch_ros.substitutions.FindPackageShare('ardupilot_sitl')
+    ardupilot_launch_file = launch.substitutions.PathJoinSubstitution([
         ardupilot_sitl_pkg_path,
         'launch',
         'sitl_dds_udp.launch.py'
     ])
 
     # Construct the full path for the parameter files
-    default_copter_params = PathJoinSubstitution([
+    default_copter_params = launch.substitutions.PathJoinSubstitution([
         ardupilot_sitl_pkg_path,
         'config',
         'default_params',
         'copter.parm'
     ])
     
-    default_airsim_copter_params = PathJoinSubstitution([
+    default_airsim_copter_params = launch.substitutions.PathJoinSubstitution([
         ardupilot_sitl_pkg_path,
         'config',
         'default_params',
         'airsim-quadX.parm'
     ])
 
-    default_dds_udp_params = PathJoinSubstitution([
+    default_dds_udp_params = launch.substitutions.PathJoinSubstitution([
         ardupilot_sitl_pkg_path,
         'config',
         'default_params',
         'dds_udp.parm'
     ])
 
-    ardupilot_sitl_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(ardupilot_launch_file),
+    ardupilot_sitl_launch = launch.actions.IncludeLaunchDescription(
+        launch.launch_description_sources.PythonLaunchDescriptionSource(ardupilot_launch_file),
         launch_arguments={
             'transport': 'udp4',
             'synthetic_clock': 'True',
@@ -83,32 +93,73 @@ def generate_launch_description():
         }.items()
     )
     delayed_launch.actions.append(
-        LogInfo(msg="Launching ardupilot_sitl after airsim_ros_pkgs.")
+        launch.actions.LogInfo(msg="Launching ardupilot_sitl after airsim_ros_pkgs.")
     )
     delayed_launch.actions.append(ardupilot_sitl_launch)
     
-    # TODO need to install appropriate gstreamer dependencies in sitl_bridge_container
-    # # --- Video Logger Launch ---
-    # controllers_pkg_path = FindPackageShare('controllers')
-    # video_logger_launch_file = PathJoinSubstitution([
-    #     controllers_pkg_path,
+    sensors_pkg_path = launch_ros.substitutions.FindPackageShare('sensors')
+    # encoder_launch_file = launch.substitutions.PathJoinSubstitution([
+    #     sensors_pkg_path,
     #     'launch',
-    #     'video.launch.py'
+    #     'ffmpeg_encode.launch.py'
     # ])
-    # video_logger_launch = IncludeLaunchDescription(
-    #     PythonLaunchDescriptionSource(video_logger_launch_file),
+    # encoder_launch = launch.actions.IncludeLaunchDescription(
+    #     launch.launch_description_sources.PythonLaunchDescriptionSource(encoder_launch_file),
     #     launch_arguments={
-    #         'log_level': "INFO",
-    #         'ap_status_topic_name': "/ap/status"
-    #     }.items()
+    #         'input_topic': '/airsim_node/Copter/front_center_Scene/image',
+    #         'ffmpeg_topic': '/front_center_camera/compressed'}.items()
     # )
     # delayed_launch.actions.append(
-    #     LogInfo(msg="Launching video_logger after ardupilot_sitl.")
+    #     launch.actions.LogInfo(msg="Launching ffmpeg_encoder after ardupilot_sitl")
     # )
-    # delayed_launch.actions.append(video_logger_launch)
+    # delayed_launch.actions.append(encoder_launch)
+    
+    all_supported_topics_list = [
+        "/ap/airspeed", "/ap/battery", "/ap/clock", "/ap/cmd_gps_pose", "/ap/cmd_vel",
+        "/ap/geopose/filtered", "/ap/goal_lla", "/ap/gps_global_origin/filtered",
+        "/ap/imu/experimental/data", "/ap/joy", "/ap/navsat", "/ap/pose/filtered",
+        "/ap/status", "/ap/tf", "/ap/tf_static", "/ap/time", "/ap/twist/filtered",
+        "/airsim_node/Copter/front_center_Scene/image/ffmpeg"
+    ]
+    topics_str = f"[{', '.join([f'{repr(topic)}' for topic in all_supported_topics_list])}]"
+    logger_launch_file = launch.substitutions.PathJoinSubstitution([
+        sensors_pkg_path,
+        'launch',
+        'managed_logger.launch.py'
+    ])
+    logger_launch = launch.actions.IncludeLaunchDescription(
+        launch.launch_description_sources.PythonLaunchDescriptionSource(logger_launch_file),
+        launch_arguments={
+            'topics_to_record': topics_str,
+            'output_bag_name': '/ws/data/telemetry'}.items()
+    )
+    delayed_launch.actions.append(
+        launch.actions.LogInfo(msg="Launching logger after ardupilot_sitl encoder")
+    )
+    delayed_launch.actions.append(logger_launch)
+    
+    video_logging_driver_node = launch_ros.actions.Node(
+        package='controllers',
+        executable='video_logging_controller_node',
+        name='video_logging_controller',
+        output='screen',
+        respawn=False,
+        arguments=['--ros-args', '--log-level', [log_level]],
+        # prefix=['gdb -ex run -ex bt --args'],
+        parameters=[{
+            'lifecycle_node_to_manage': 'managed_logger_node', # Hardcoded target node name for the driver
+            'ap_status_topic': ap_status_topic_name,   # Pass the status topic to the driver
+        }],
+    )
+    delayed_launch.actions.append(
+        launch.actions.LogInfo(msg="Launching logging controller after logger encoder")
+    )
+    delayed_launch.actions.append(video_logging_driver_node)
 
-    return LaunchDescription([
-        LogInfo(msg="Assuming AirSim simulator is starting/started externally."),
-        LogInfo(msg="Introducing a 3-second delay before launching airsim_ros_pkgs."),
+    return launch.LaunchDescription([
+        log_level_arg,
+        ap_status_topic_arg,
+        launch.actions.LogInfo(msg="Assuming AirSim simulator is starting/started externally."),
+        launch.actions.LogInfo(msg="Introducing a 3-second delay before launching airsim_ros_pkgs."),
         delayed_launch
     ])

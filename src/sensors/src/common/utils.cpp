@@ -1,4 +1,4 @@
-#include "sensors/video/common.h"
+#include "sensors/common/utils.h"
 
 void check_element_creation(GstElement *element, const std::string &name) {
     if (!element) {
