@@ -1,4 +1,4 @@
-#include "sensors/video/common.h"
+#include "sensors/common/utils.h"
 #include <gst/app/gstappsrc.h>
 
 class VideoLogger{

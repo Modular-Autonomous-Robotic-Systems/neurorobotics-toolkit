@@ -8,6 +8,33 @@ def generate_launch_description():
             "log-level",
             default_value=[logger_default],
             description="Logging level")
+    sensors_pkg_path = launch_ros.substitutions.FindPackageShare('sensors')
+    encoder_launch_file = launch.substitutions.PathJoinSubstitution([
+        sensors_pkg_path,
+        'launch',
+        'ffmpeg_encode.launch.py'
+    ])
+    encoder_launch = launch.actions.IncludeLaunchDescription(
+        launch.launch_description_sources.PythonLaunchDescriptionSource(encoder_launch_file),
+        launch_arguments={
+            'input_topic': '/image_raw',
+            'ffmpeg_topic': '/camera/compressed'}.items()
+    )
+    all_supported_topics_list = [
+        '/camera/compressed'
+    ]
+    topics_str = f"[{', '.join([f'{repr(topic)}' for topic in all_supported_topics_list])}]"
+    logger_launch_file = launch.substitutions.PathJoinSubstitution([
+        sensors_pkg_path,
+        'launch',
+        'managed_logger.launch.py'
+    ])
+    logger_launch = launch.actions.IncludeLaunchDescription(
+        launch.launch_description_sources.PythonLaunchDescriptionSource(logger_launch_file),
+        launch_arguments={
+            'topics_to_record': topics_str,
+            'output_bag_name': '/ws/data/telemetry'}.items()
+    )
     nodes = [
         # Tello driver node
         launch_ros.actions.Node(
@@ -37,6 +64,8 @@ def generate_launch_description():
                 'camera_topic': '/camera',
             }]
         ),
+        encoder_launch,
+        logger_launch,
 
         # ORB SLAM3 compute node
         launch_ros.actions.Node(
