@@ -98,21 +98,7 @@ def generate_launch_description():
     delayed_launch.actions.append(ardupilot_sitl_launch)
     
     sensors_pkg_path = launch_ros.substitutions.FindPackageShare('sensors')
-    # encoder_launch_file = launch.substitutions.PathJoinSubstitution([
-    #     sensors_pkg_path,
-    #     'launch',
-    #     'ffmpeg_encode.launch.py'
-    # ])
-    # encoder_launch = launch.actions.IncludeLaunchDescription(
-    #     launch.launch_description_sources.PythonLaunchDescriptionSource(encoder_launch_file),
-    #     launch_arguments={
-    #         'input_topic': '/airsim_node/Copter/front_center_Scene/image',
-    #         'ffmpeg_topic': '/front_center_camera/compressed'}.items()
-    # )
-    # delayed_launch.actions.append(
-    #     launch.actions.LogInfo(msg="Launching ffmpeg_encoder after ardupilot_sitl")
-    # )
-    # delayed_launch.actions.append(encoder_launch)
+    controllers_pkg_path = launch_ros.substitutions.FindPackageShare('controllers')
     
     all_supported_topics_list = [
         "/ap/airspeed", "/ap/battery", "/ap/clock", "/ap/cmd_gps_pose", "/ap/cmd_vel",
@@ -122,39 +108,23 @@ def generate_launch_description():
         "/airsim_node/Copter/front_center_Scene/image/ffmpeg"
     ]
     topics_str = f"[{', '.join([f'{repr(topic)}' for topic in all_supported_topics_list])}]"
-    logger_launch_file = launch.substitutions.PathJoinSubstitution([
-        sensors_pkg_path,
+    managed_logger_launch_file = launch.substitutions.PathJoinSubstitution([
+        controllers_pkg_path,
         'launch',
-        'managed_logger.launch.py'
+        'target_recorder.launch.py'
     ])
-    logger_launch = launch.actions.IncludeLaunchDescription(
-        launch.launch_description_sources.PythonLaunchDescriptionSource(logger_launch_file),
+    managed_logger_launch = launch.actions.IncludeLaunchDescription(
+        launch.launch_description_sources.PythonLaunchDescriptionSource(managed_logger_launch_file),
         launch_arguments={
+            'log_level': log_level,
+            'ap_status_topic_name': ap_status_topic_name,
             'topics_to_record': topics_str,
             'output_bag_name': '/ws/data/telemetry'}.items()
     )
     delayed_launch.actions.append(
         launch.actions.LogInfo(msg="Launching logger after ardupilot_sitl encoder")
     )
-    delayed_launch.actions.append(logger_launch)
-    
-    video_logging_driver_node = launch_ros.actions.Node(
-        package='controllers',
-        executable='video_logging_controller_node',
-        name='video_logging_controller',
-        output='screen',
-        respawn=False,
-        arguments=['--ros-args', '--log-level', [log_level]],
-        # prefix=['gdb -ex run -ex bt --args'],
-        parameters=[{
-            'lifecycle_node_to_manage': 'managed_logger_node', # Hardcoded target node name for the driver
-            'ap_status_topic': ap_status_topic_name,   # Pass the status topic to the driver
-        }],
-    )
-    delayed_launch.actions.append(
-        launch.actions.LogInfo(msg="Launching logging controller after logger encoder")
-    )
-    delayed_launch.actions.append(video_logging_driver_node)
+    delayed_launch.actions.append(managed_logger_launch)
 
     return launch.LaunchDescription([
         log_level_arg,

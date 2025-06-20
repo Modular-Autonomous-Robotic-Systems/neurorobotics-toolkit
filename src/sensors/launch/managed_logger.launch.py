@@ -1,9 +1,6 @@
 import os
-from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, RegisterEventHandler, ExecuteProcess, TimerAction
-from launch.event_handlers import OnProcessStart
-from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import LifecycleNode, Node
+import launch
+import launch_ros
 from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
@@ -16,7 +13,7 @@ def generate_launch_description():
     # --- Declare Launch Arguments ---
 
     # Argument for the output bag file name (without extension).
-    output_bag_name_arg = DeclareLaunchArgument(
+    output_bag_name_arg = launch.actions.DeclareLaunchArgument(
         'output_bag_name',
         default_value='/ws/data/telemetry',
         description='Name of the output rosbag file.'
@@ -33,7 +30,7 @@ def generate_launch_description():
     # This is the format the ROS 2 parameter system expects for a vector of strings.
     default_topics_str = f"[{', '.join([f'{repr(topic)}' for topic in all_supported_topics_list])}]"
 
-    topics_to_record_arg = DeclareLaunchArgument(
+    topics_to_record_arg = launch.actions.DeclareLaunchArgument(
         'topics_to_record',
         default_value=default_topics_str,
         description="A string-formatted list of topics to record, e.g., \"['/topic1', '/topic2']\""
@@ -42,7 +39,7 @@ def generate_launch_description():
     # --- Node Definition ---
 
     # Define the LifecycleNode for the logger.
-    logger_node = Node(
+    logger_node = launch_ros.actions.Node(
         package='sensors',
         executable='managed_logger_node',
         name=None,
@@ -50,14 +47,14 @@ def generate_launch_description():
         output='screen',
         # prefix = ['gdb -ex r -ex bt --args'],
         parameters=[{
-            'output_bag_name': LaunchConfiguration('output_bag_name'),
+            'output_bag_name': launch.substitutions.LaunchConfiguration('output_bag_name'),
             # Pass the launch argument directly. The C++ node's get_parameter call
             # for a std::vector<std::string> will correctly parse the string-formatted list.
-            'topics_to_record': LaunchConfiguration('topics_to_record'),
+            'topics_to_record': launch.substitutions.LaunchConfiguration('topics_to_record'),
         }]
     )
 
-    ld = LaunchDescription()
+    ld = launch.LaunchDescription()
     ld.add_action(output_bag_name_arg)
     ld.add_action(topics_to_record_arg)
     ld.add_action(logger_node)
