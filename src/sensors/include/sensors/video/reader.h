@@ -1,4 +1,4 @@
-#include "sensors/video/common.h"
+#include "sensors/common/utils.h"
 #include <rclcpp_lifecycle/lifecycle_publisher.hpp>
 #include <gst/app/app.h>
 #include <thread>

@@ -7,6 +7,9 @@
 #include "sensor_msgs/msg/image.hpp"
 #include <cv_bridge/cv_bridge.h>
 #include <memory>
+#include <string>
+#include <vector>
+#include <map>
 
 typedef struct {
 	int mWidth;

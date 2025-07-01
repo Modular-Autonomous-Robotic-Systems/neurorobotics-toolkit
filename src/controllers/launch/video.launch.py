@@ -1,7 +1,5 @@
 import launch
 import launch_ros
-from launch.substitutions import LaunchConfiguration
-from launch.actions import DeclareLaunchArgument
 
 def generate_launch_description():
     """
@@ -10,21 +8,21 @@ def generate_launch_description():
     """
 
     # Declare launch arguments for more flexibility
-    log_level_arg = DeclareLaunchArgument(
+    log_level_arg = launch.actions.DeclareLaunchArgument(
         "log_level",
         default_value="INFO",
         description="Logging level for the nodes (DEBUG, INFO, WARN, ERROR, FATAL)"
     )
 
-    ap_status_topic_arg = DeclareLaunchArgument(
+    ap_status_topic_arg = launch.actions.DeclareLaunchArgument(
         "ap_status_topic_name",
         default_value="/ap/status", # Default AP status topic
         description="Topic name for ArduPilot status messages."
     )
 
     # Get LaunchConfiguration values to be used by nodes
-    log_level = LaunchConfiguration("log_level")
-    ap_status_topic_name = LaunchConfiguration("ap_status_topic_name")
+    log_level = launch.substitutions.LaunchConfiguration("log_level")
+    ap_status_topic_name = launch.substitutions.LaunchConfiguration("ap_status_topic_name")
 
     # 1. Node action for the video_logger_node (the managed lifecycle node)
     video_logger_test_node = launch_ros.actions.Node(
