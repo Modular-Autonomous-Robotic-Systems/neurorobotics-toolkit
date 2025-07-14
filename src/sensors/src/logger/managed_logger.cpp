@@ -132,10 +132,50 @@ CallbackReturn ManagedLogger::on_cleanup(const rclcpp_lifecycle::State &)
 	return CallbackReturn::SUCCESS;
 }
 
+bool ManagedLogger::UpdateFilenameIfExists(std::string& filepath) {
+    if (std::filesystem::exists(filepath)) {
+        size_t last_underscore_pos = filepath.rfind('_');
+
+        if (last_underscore_pos == std::string::npos) {
+			// First replacement ID starts with 1
+            filepath += "_1";
+        } else {
+            try {
+                std::string number_str = filepath.substr(last_underscore_pos + 1);
+                int current_number = std::stoi(number_str);
+                int new_number = current_number + 1;
+                // Create the new filename by replacing the old number with the new one.
+                filepath = filepath.substr(0, last_underscore_pos + 1) + std::to_string(new_number);
+            } catch (const std::invalid_argument& ia) {
+                // This catch block handles cases where the substring after '_' is not a valid number.
+                // For example, "/ws/data/telemetry_". In this case, we can append "1".
+                filepath += "1";
+            } catch (const std::out_of_range& oor) {
+                // This handles cases where the number is too large to fit in an int.
+                RCLCPP_ERROR(this->get_logger(), "Error: Number out of range in filename: %s", filepath.c_str());
+            }
+        }
+		if(!UpdateFilenameIfExists(filepath)){
+			RCLCPP_INFO(this->get_logger(), "Provided filename exists, logging at: %s", filepath.c_str());
+		}
+		return true;
+    }
+	else{
+		return false;
+	}
+    // If the file does not exist, the filepath remains unchanged.
+}
+
 void ManagedLogger::InitializeParameters()
 {
 	this->get_parameter("output_bag_name", mpOutputBagName);
 	this->get_parameter("topics_to_record", mvpTopicsToRecord);
+	UpdateFilenameIfExists(mpOutputBagName);
+
+	if(std::filesystem::exists(mpOutputBagName)){
+		RCLCPP_WARN(this->get_logger(), "bag with specified name exists, adding a number in the name to distinguish");
+
+	}
 
 	if (mvpTopicsToRecord.empty()) {
 		RCLCPP_ERROR(this->get_logger(), "Parameter 'topics_to_record' is not set or is empty.");

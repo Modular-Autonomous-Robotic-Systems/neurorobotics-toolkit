@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <filesystem>
 
 typedef struct {
 	int mWidth;
