@@ -21,7 +21,7 @@ def generate_launch_description():
     output_bag_name_arg = launch.actions.DeclareLaunchArgument(
         'output_bag_name',
         default_value='/ws/data/telemetry',
-        description='Name of the output rosbag file.'
+        description='Name of the output rosbag file. The output bag name must not contain special symbols and numbers.'
     )
 
     # Define the list of all supported topics.
@@ -29,7 +29,8 @@ def generate_launch_description():
         "/ap/airspeed", "/ap/battery", "/ap/clock", "/ap/cmd_gps_pose", "/ap/cmd_vel",
         "/ap/geopose/filtered", "/ap/goal_lla", "/ap/gps_global_origin/filtered",
         "/ap/imu/experimental/data", "/ap/joy", "/ap/navsat", "/ap/pose/filtered",
-        "/ap/status", "/ap/tf", "/ap/tf_static", "/ap/time", "/ap/twist/filtered"
+        "/ap/status", "/ap/tf", "/ap/tf_static", "/ap/time", "/ap/twist/filtered",
+        "/tf", "/tf_static"
     ]
     # Format the list into a string that looks like a Python list, e.g., "['/topic1', '/topic2']"
     # This is the format the ROS 2 parameter system expects for a vector of strings.

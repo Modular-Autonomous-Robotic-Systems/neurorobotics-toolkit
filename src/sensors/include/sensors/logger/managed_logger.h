@@ -55,6 +55,10 @@ class ManagedLogger : public rclcpp_lifecycle::LifecycleNode
 		 * @brief Reads and validates parameters from the parameter server.
 		 */
 		void InitializeParameters();
+		/**
+		 * @brief Checks if the provided bagfile path exists and updates the output file path with an incremental ID
+		 */
+		bool UpdateFilenameIfExists(std::string& filepath);
 
 		/// @brief A shared pointer to the underlying rosbag2 C++ writer instance.
 		std::shared_ptr<rosbag2_cpp::Writer> mpWriter;
