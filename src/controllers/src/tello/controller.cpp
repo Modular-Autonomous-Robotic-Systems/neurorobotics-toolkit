@@ -1,31 +1,41 @@
-#include <tello_controller/controller.h>
+#include <controllers/tello/controller.h>
 
 using namespace std::chrono_literals;
 
-TelloControllerNode::TelloControllerNode(std::string nodeName):Node(nodeName){
+TelloControllerNode::TelloControllerNode(const rclcpp::NodeOptions& options):LifecycleControllerBase("tello_controller_driver", options){
     //initialize time keeper
+	rcl_interfaces::msg::ParameterDescriptor droneNameDesc;
+	droneNameDesc.description = "Path to output file for received video";
+	droneNameDesc.type = 4;
+	this->declare_parameter<std::string>("drone_name", "drone1", droneNameDesc);
+	mpDroneName = this->get_parameter("drone_name").as_string();
 
     RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Starting node...");
     
+
     mpClock = std::make_shared<rclcpp::Clock>(RCL_SYSTEM_TIME);
+	LifecycleControllerBase::ChangeStateCallbackType changeCb =
+		std::bind(&TelloControllerNode::OnTelloDriverChangeStateResponse, this,
+				std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+
+	LifecycleControllerBase::GetStateCallbackType getCb =
+		std::bind(&TelloControllerNode::OnTelloDriverGetStateResponse, this,
+				std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+
+	this->mpLifecycleNodeNameToManage = mpDroneName + "/tello_joy";
+	if (!this->RegisterNode(this->mpLifecycleNodeNameToManage, changeCb, getCb)) {
+		RCLCPP_FATAL(this->get_logger(), "Failed to register node '%s' with base controller. Exiting.", this->mpLifecycleNodeNameToManage.c_str());
+		rclcpp::shutdown();
+		return;
+	}
+
+	this->WaitForAllRegisteredServices();
 
     //subsription
     mpFlightDataSubsriber = this->create_subscription<tello_msgs::msg::FlightData>(
         "flight_data",
         10,
         std::bind(&TelloControllerNode::FlightDataCallback,this,std::placeholders::_1)
-    );
-
-    mpImageRawSubscriber = this->create_subscription<sensor_msgs::msg::Image>(
-        "image_raw",
-        10,
-        std::bind(&TelloControllerNode::ImageCallback,this,std::placeholders::_1)
-    );
-
-    mpCameraInforSubscriber = this->create_subscription<sensor_msgs::msg::CameraInfo>(
-        "camera_info",
-        10,
-        std::bind(&TelloControllerNode::CameraInfoCallback, this, std::placeholders::_1)
     );
 
     mpActionResponseSubscriber = this->create_subscription<std_msgs::msg::String>(
@@ -43,37 +53,34 @@ TelloControllerNode::TelloControllerNode(std::string nodeName):Node(nodeName){
     mpActionClient = this->create_client<tello_msgs::srv::TelloAction>(
         "tello_action"
     );
-
-    mpTeleopLifecycleClient = this->create_client<lifecycle_msgs::srv::ChangeState>(
-        "tello_joy/change_state"
-    );
     
-    changeTeleopState("configure");
+	uint8_t transitionToAttempt = lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE;
+	std::shared_future<lifecycle_msgs::srv::ChangeState::Response::SharedPtr> futureResult =  this->AsyncCallChangeState(this->mpLifecycleNodeNameToManage, transitionToAttempt);
+	this->EnqueueServiceResponseHandlerTask(this->mpLifecycleNodeNameToManage, futureResult, transitionToAttempt);
 
     using namespace std::chrono_literals;
 
-    mpFlightChecker = this->create_wall_timer(15s,std::bind(&TelloControllerNode::timer_callback,this));
+    // mpFlightChecker = this->create_wall_timer(15s,std::bind(&TelloControllerNode::timer_callback,this));
 
 }
 
-void TelloControllerNode::timer_callback(){
-    //pre take off , check status of telemetry and frequency
-    
-    if(!mpReadyTakeOff){
-        RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Preflight Check");
-        if (mpImageFreq > 0 && mpCameraInfoFreq > 0) {
-
-            changeTeleopState("activate");
-            mpReadyTakeOff = true;
-
-            RCLCPP_INFO(this->get_logger(), "Camera and Image: OK");
-            RCLCPP_INFO(this->get_logger(), "Ready To Take off...");
-
-        }else{
-            RCLCPP_ERROR(this->get_logger(), "Did not recieved any image...");
-        }
-    }
-}
+// void TelloControllerNode::timer_callback(){
+//     //pre take off , check status of telemetry and frequency
+//     
+//     if(!mpReadyTakeOff && this->mpTelloDriverKnownState == lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE){
+//         RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Preflight Check");
+// 		// changeTeleopState("activate");
+// 		uint8_t transitionToAttempt = lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE;
+// 		std::shared_future<lifecycle_msgs::srv::ChangeState::Response::SharedPtr> futureResult =  this->AsyncCallChangeState(this->mpLifecycleNodeNameToManage, transitionToAttempt);
+// 		this->EnqueueServiceResponseHandlerTask(this->mpLifecycleNodeNameToManage, futureResult, transitionToAttempt);
+//
+// 		mpReadyTakeOff = true;
+//
+// 		RCLCPP_INFO(this->get_logger(), "Camera and Image: OK");
+// 		RCLCPP_INFO(this->get_logger(), "Ready To Take off...");
+//
+//     }
+// }
 
 void TelloControllerNode::FlightDataCallback(const tello_msgs::msg::FlightData::ConstSharedPtr &flightData){
 
@@ -89,50 +96,10 @@ void TelloControllerNode::FlightDataCallback(const tello_msgs::msg::FlightData::
     // more failsafe condition, where we force emergency landing if condition are met
 
     if(flightData->bat<10){
+		RCLCPP_WARN(this->get_logger(), "Battery less than 10%. Unable to fly");
         ActionRequestSender("land");
     }
 
-}
-
-
-void TelloControllerNode::ImageCallback(const sensor_msgs::msg::Image::ConstSharedPtr &img){
-    //check frequency of image
-    if(!img){
-
-        RCLCPP_ERROR(this->get_logger(), "Got empty image message");
-        return;
-
-    }
-
-        int32_t current_time = img->header.stamp.nanosec;
-
-        float diff = current_time - mpLastImageTime;
-
-        mpImageFreq = 1000000000.0 / diff;
-
-        mpLastImageTime = current_time;
-
-        RCLCPP_INFO(this->get_logger(), "Image recieved frequency: %.2f Hz", mpImageFreq);
-}
-
-//use image timestamp header instead of timer
-void TelloControllerNode::CameraInfoCallback(const sensor_msgs::msg::CameraInfo::ConstSharedPtr &camInfo){
-
-    if(!camInfo){
-
-        RCLCPP_ERROR(this->get_logger(), "Got empty camera info message");
-        return;
-    }
-
-        auto current = camInfo->header.stamp.nanosec;
-
-        float diff = current - mpLastCamInfoTime;
-
-        mpCameraInfoFreq = 1000000000.0 / diff;
-
-        mpLastCamInfoTime = current;
-
-        RCLCPP_INFO(this->get_logger(), "Camera info frequency: %.2f Hz", mpCameraInfoFreq);
 }
 
 //this will be used for fail safe request sender
@@ -214,7 +181,7 @@ void TelloControllerNode::changeTeleopState(const std::string state){
 
     };
     
-    mpTeleopLifecycleClient->async_send_request(request, response_callback);
+    // mpTeleopLifecycleClient->async_send_request(request, response_callback);
     RCLCPP_INFO(this->get_logger(), "Sent request to change teleop state to %s", state.c_str());
 
     //sleep to wait for callback return
@@ -236,4 +203,52 @@ void TelloControllerNode::TelloStateCallback(const std_msgs::msg::String::ConstS
     
     mpTelloFlightState = stateMessage->data;
 
+}
+void TelloControllerNode::OnTelloDriverChangeStateResponse(
+		uint8_t attemptedTransitionId,
+		bool success,
+		lifecycle_msgs::srv::ChangeState::Response::ConstSharedPtr response){
+	RCLCPP_INFO(this->get_logger(), "Received Response after tello driver state change request with transition id: %d", attemptedTransitionId);
+	if(success){
+		if(attemptedTransitionId == lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE){
+			RCLCPP_INFO(this->get_logger(), "Successfully configured tello driver node");
+			this->mpTelloDriverKnownState = lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE;
+			if (!mpReadyTakeOff) {
+				RCLCPP_INFO(this->get_logger(), "Node not activated, attempting activation");
+				uint8_t transitionToAttempt = lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE;
+				std::shared_future<lifecycle_msgs::srv::ChangeState::Response::SharedPtr> futureResult =  this->AsyncCallChangeState(this->mpLifecycleNodeNameToManage, transitionToAttempt);
+				this->EnqueueServiceResponseHandlerTask(this->mpLifecycleNodeNameToManage, futureResult, transitionToAttempt);
+
+				mpReadyTakeOff = true;
+
+				RCLCPP_INFO(this->get_logger(), "Camera and Image: OK");
+				RCLCPP_INFO(this->get_logger(), "Ready To Take off...");
+
+			}else{
+				RCLCPP_ERROR(this->get_logger(), "Did not recieved any image...");
+			}
+
+		}
+		else if(attemptedTransitionId == lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE){
+			RCLCPP_INFO(this->get_logger(), "Tello Joystick Node activated");	
+		}
+	}
+}
+
+void TelloControllerNode::OnTelloDriverGetStateResponse(
+		const std::string& context,
+		bool success,
+		lifecycle_msgs::srv::GetState::Response::ConstSharedPtr response){
+
+}
+
+int main(int argc, char **argv) {
+    rclcpp::init(argc, argv);
+	rclcpp::NodeOptions options;
+    std::shared_ptr<TelloControllerNode> node = std::make_shared<TelloControllerNode>(options);
+	rclcpp::executors::MultiThreadedExecutor executor; 
+	executor.add_node(node); 
+	executor.spin(); 
+    rclcpp::shutdown();
+    return 0;
 }

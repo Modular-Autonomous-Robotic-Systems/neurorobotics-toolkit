@@ -1,4 +1,3 @@
-
 #include <rclcpp/rclcpp.hpp>
 #include <tello_msgs/srv/tello_action.hpp>
 #include <std_msgs/msg/string.hpp>
@@ -8,12 +7,13 @@
 #include <string>
 #include <chrono>
 #include "lifecycle_msgs/srv/change_state.hpp"
+#include "controllers/common/controller.h"
 
 
 
-class TelloControllerNode: public rclcpp::Node{
+class TelloControllerNode: public LifecycleControllerBase{
         public:
-                TelloControllerNode(std::string nodeName);
+                TelloControllerNode(const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
 
                 void FlightDataCallback(const tello_msgs::msg::FlightData::ConstSharedPtr &flightData);
 
@@ -45,12 +45,6 @@ class TelloControllerNode: public rclcpp::Node{
 
                 bool mplowBattery = false;
 
-                //frequency off data
-
-                double mpImageFreq = 0.0;
-                
-                double mpCameraInfoFreq = 0.0;
-
                 std::string mpActionRequest;
 
                 //client and subscriber
@@ -66,18 +60,26 @@ class TelloControllerNode: public rclcpp::Node{
 
                 rclcpp::Subscription<std_msgs::msg::String>::SharedPtr mpTelloStateSubscriber;
                 
-                //Controller lifecycle state client
-                rclcpp::Client<lifecycle_msgs::srv::ChangeState>::SharedPtr mpTeleopLifecycleClient;
+                // //Controller lifecycle state client
+                // rclcpp::Client<lifecycle_msgs::srv::ChangeState>::SharedPtr mpTeleopLifecycleClient;
 
                 //ros2 timer
                 rclcpp::TimerBase::SharedPtr mpFlightChecker;
 
                 rclcpp::Clock::SharedPtr mpClock;
 
-                int32_t mpLastImageTime = 0;
+				void OnTelloDriverChangeStateResponse(
+						uint8_t attemptedTransitionId,
+						bool success,
+						lifecycle_msgs::srv::ChangeState::Response::ConstSharedPtr response);
 
-                int32_t mpLastCamInfoTime = 0;
-                
- 
+				void OnTelloDriverGetStateResponse(
+						const std::string& context,
+						bool success,
+						lifecycle_msgs::srv::GetState::Response::ConstSharedPtr response);
+
+				std::string mpLifecycleNodeNameToManage;
+				uint8_t mpTelloDriverKnownState = lifecycle_msgs::msg::State::PRIMARY_STATE_UNKNOWN;
+				std::string mpDroneName = "drone1";
                 
 };

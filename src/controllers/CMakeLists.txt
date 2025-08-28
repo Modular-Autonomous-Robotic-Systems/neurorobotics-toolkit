@@ -32,8 +32,8 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
 
 
 add_executable(tello_controller_node
-	controllers/tello_controller/tello_controller.cpp
-	controllers/tello_controller/tello_controller_main.cpp
+	src/tello/controller.cpp
+	src/common/controller.cpp
 )
 ament_target_dependencies(tello_controller_node
 	PUBLIC ${THIS_PACKAGE_INCLUDE_DEPENDS}
