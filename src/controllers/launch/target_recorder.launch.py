@@ -10,12 +10,18 @@ def generate_launch_description():
     )
     ap_status_topic_arg = launch.actions.DeclareLaunchArgument(
         "ap_status_topic_name",
-        default_value="/ap/status", # Default AP status topic
-        description="Topic name for ArduPilot status messages."
+        default_value="/ap/status",
+        description="Topic name for Auto Pilot status messages."
+    )
+    ap_type_arg = launch.actions.DeclareLaunchArgument(
+        "ap_type",
+        default_value="ArduPilot",
+        description="Autopilot type to log data for"
     )
     # Get LaunchConfiguration values to be used by nodes
     log_level = launch.substitutions.LaunchConfiguration("log_level")
     ap_status_topic_name = launch.substitutions.LaunchConfiguration("ap_status_topic_name")
+    ap_type = launch.substitutions.LaunchConfiguration("ap_type")
     
     # Argument for the output bag file name (without extension).
     output_bag_name_arg = launch.actions.DeclareLaunchArgument(
@@ -83,12 +89,14 @@ def generate_launch_description():
         parameters=[{
             'lifecycle_node_to_manage': 'managed_logger_node', # Hardcoded target node name for the driver
             'ap_status_topic': ap_status_topic_name,   # Pass the status topic to the driver
+            'ap_type': ap_type 
         }],
     )
 
     return launch.LaunchDescription([
         log_level_arg,
         ap_status_topic_arg,
+        ap_type_arg,
         output_bag_name_arg,
         topics_to_record_arg,
         logger_launch,

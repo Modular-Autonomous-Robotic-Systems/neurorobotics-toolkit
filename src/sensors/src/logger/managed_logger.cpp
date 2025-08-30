@@ -25,6 +25,10 @@ CallbackReturn ManagedLogger::on_configure(const rclcpp_lifecycle::State &)
 	mpRecordOptions = std::make_shared<rosbag2_transport::RecordOptions>();
 	mpRecordOptions->all = false; // We are specifying topics
 	mpRecordOptions->topics = mvpTopicsToRecord;
+	RCLCPP_INFO(this->get_logger(), "Logging the following topics:");
+	for(int i = 0; i < mvpTopicsToRecord.size(); i++){
+		RCLCPP_INFO(this->get_logger(), "Topic %d: %s", i, mvpTopicsToRecord[i].c_str());
+	}
 	mpRecordOptions->rmw_serialization_format = std::string(rmw_get_serialization_format()) ;
 	// mpRecordOptions->topic_polling_interval = std::chrono::milliseconds(1);
 

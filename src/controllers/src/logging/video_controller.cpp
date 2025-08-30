@@ -70,11 +70,14 @@ void VideoLoggingDriver::InitializeDriverParameters()
 {
 	this->declare_parameter<std::string>("lifecycle_node_to_manage", DRIVER_DEFAULT_LIFECYCLE_NODE_TO_MANAGE);
 	this->declare_parameter<std::string>("ap_status_topic", DRIVER_DEFAULT_AP_STATUS_TOPIC);
+	this->declare_parameter<std::string>("ap_type", DRIVER_DEFAULT_AP_TYPE);
 
 	this->get_parameter("lifecycle_node_to_manage", this->mpLifecycleNodeNameToManage);
 	this->get_parameter("ap_status_topic", this->mpAPStatusTopic); // Renamed
+	this->get_parameter("ap_type", this->mpAPType);
 	RCLCPP_INFO(this->get_logger(), "Driver will manage node: '%s'", this->mpLifecycleNodeNameToManage.c_str());
 	RCLCPP_INFO(this->get_logger(), "Driver listening to status on: '%s'", this->mpAPStatusTopic.c_str());
+	RCLCPP_INFO(this->get_logger(), "Driver listening to AP Type: '%s'", this->mpAPType.c_str());
 }
 
 void VideoLoggingDriver::SetupROSInterfaces() // Renamed
@@ -82,16 +85,25 @@ void VideoLoggingDriver::SetupROSInterfaces() // Renamed
 	rclcpp::SubscriptionOptions subOptions;
 	subOptions.callback_group = mpCallbackGroupReentrant; 
 
-	this->mpStatusSubscriber = this->create_subscription<ardupilot_msgs::msg::Status>(
-			this->mpAPStatusTopic, // Renamed variable used here
-			10, 
-			std::bind(&VideoLoggingDriver::StatusCallback, this, std::placeholders::_1),
-			subOptions); 
+	if(this->mpAPType == "ardupilot"){
+		this->mpArduPilotStatusSubscriber = this->create_subscription<ardupilot_msgs::msg::Status>(
+				this->mpAPStatusTopic, // Renamed variable used here
+				10, 
+				std::bind(&VideoLoggingDriver::ArduPilotStatusCallback, this, std::placeholders::_1),
+				subOptions); 
+	}
+	else if(this->mpAPType == "tello"){
+		this->mpTelloStatusSubscriber = this->create_subscription<std_msgs::msg::String>(
+				this->mpAPStatusTopic, // Renamed variable used here
+				10, 
+				std::bind(&VideoLoggingDriver::TelloStatusCallback, this, std::placeholders::_1),
+				subOptions); 	
+	}
 	RCLCPP_INFO(this->get_logger(), "Status subscriber created on topic '%s'.", this->mpAPStatusTopic.c_str());
 }
 
 
-void VideoLoggingDriver::StatusCallback(const ardupilot_msgs::msg::Status::ConstSharedPtr msg)
+void VideoLoggingDriver::ArduPilotStatusCallback(const ardupilot_msgs::msg::Status::ConstSharedPtr msg)
 {
 	this->mpStatusMessageCounter++;
 	RCLCPP_INFO(this->get_logger(), "--- Status Callback Start (Msg #%d, armed: %d, flying: %d) ---",
@@ -152,6 +164,83 @@ void VideoLoggingDriver::StatusCallback(const ardupilot_msgs::msg::Status::Const
 	}
 
 	std::unique_lock<std::mutex> lock(mpcStatusMutex); 
+	this->mpPreviousArmedStatus = currentArmed;
+	this->mpPreviousFlyingStatus = currentFlying;
+	RCLCPP_INFO(this->get_logger(), "--- Status Callback End (Msg #%d) ---", this->mpStatusMessageCounter);
+}
+
+void VideoLoggingDriver::TelloStatusCallback(const std_msgs::msg::String::ConstSharedPtr msg){
+	RCLCPP_INFO(this->get_logger(), "Received Tello Status %s", msg->data.c_str());
+	this->mpStatusMessageCounter++;
+	bool currentArmed = false;
+	bool currentFlying = false;
+	std::unique_lock<std::mutex> lock(mpcStatusMutex); 
+	if(msg->data == "taking off"){
+		currentArmed = true;
+		currentFlying = true;
+	}
+	else if(msg->data == "flying"){
+		if(!this->mpPreviousFlyingStatus){
+			currentArmed = true;
+		}
+		currentFlying = true;
+	}
+	else if(msg->data == "landed"){
+		currentArmed = false;
+		currentFlying = false;
+	}
+
+	uint8_t transitionToAttempt = 0; 
+	bool triggerTransition = false;
+	bool isChainedOperation = false; 
+
+	if (currentArmed && !this->mpPreviousArmedStatus) {
+		RCLCPP_INFO(this->get_logger(), "UAV is ARMED. Target: configure '%s'.", this->mpLifecycleNodeNameToManage.c_str());
+		if (this->mpVideoLoggerKnownState == lifecycle_msgs::msg::State::PRIMARY_STATE_UNCONFIGURED || this->mpVideoLoggerKnownState == lifecycle_msgs::msg::State::PRIMARY_STATE_UNKNOWN) {
+			transitionToAttempt = lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE;
+			triggerTransition = true;
+		} else { 
+			RCLCPP_INFO(this->get_logger(), "Node '%s' is in state '%s', no configure action needed for arming.", 
+					this->mpLifecycleNodeNameToManage.c_str(), GetStateLabel(this->mpVideoLoggerKnownState).c_str());
+		}
+	} else if (currentFlying && !this->mpPreviousFlyingStatus && currentArmed) {
+		RCLCPP_INFO(this->get_logger(), "UAV is FLYING and ARMED. Target: activate '%s'.", this->mpLifecycleNodeNameToManage.c_str());
+		if (this->mpVideoLoggerKnownState == lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE) {
+			transitionToAttempt = lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE;
+			triggerTransition = true;
+		} else if (this->mpVideoLoggerKnownState == lifecycle_msgs::msg::State::PRIMARY_STATE_UNCONFIGURED) {
+			RCLCPP_WARN(this->get_logger(), "'%s' is unconfigured. Will attempt to configure then activate.", this->mpLifecycleNodeNameToManage.c_str());
+			isChainedOperation = true; 
+			std::shared_future<lifecycle_msgs::srv::ChangeState::Response::SharedPtr> configureFuture = 
+				this->AsyncCallChangeState(this->mpLifecycleNodeNameToManage, lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE);
+			this->EnqueueServiceResponseHandlerTask(this->mpLifecycleNodeNameToManage, configureFuture, lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE);
+		} else { 
+			RCLCPP_INFO(this->get_logger(), "Node '%s' is in state '%s', no activate action needed for flying.", 
+					this->mpLifecycleNodeNameToManage.c_str(), GetStateLabel(this->mpVideoLoggerKnownState).c_str());
+		}
+	} else if (!currentFlying && this->mpPreviousFlyingStatus) {
+		RCLCPP_INFO(this->get_logger(), "UAV has STOPPED FLYING. Target: deactivate and cleanup '%s'.", this->mpLifecycleNodeNameToManage.c_str());
+		if (this->mpVideoLoggerKnownState == lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE) {
+			isChainedOperation = true; 
+			std::shared_future<lifecycle_msgs::srv::ChangeState::Response::SharedPtr> deactivateFuture = 
+				this->AsyncCallChangeState(this->mpLifecycleNodeNameToManage, lifecycle_msgs::msg::Transition::TRANSITION_DEACTIVATE);
+			this->EnqueueServiceResponseHandlerTask(this->mpLifecycleNodeNameToManage, deactivateFuture, lifecycle_msgs::msg::Transition::TRANSITION_DEACTIVATE);
+		} else if (this->mpVideoLoggerKnownState == lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE) {
+			RCLCPP_INFO(this->get_logger(), "Node '%s' is Inactive. Directly attempting Cleanup.", this->mpLifecycleNodeNameToManage.c_str());
+			transitionToAttempt = lifecycle_msgs::msg::Transition::TRANSITION_CLEANUP;
+			triggerTransition = true; 
+		} else { 
+			RCLCPP_INFO(this->get_logger(), "Node '%s' is in state '%s', no deactivate/cleanup action needed for stopping flight.", 
+					this->mpLifecycleNodeNameToManage.c_str(), GetStateLabel(this->mpVideoLoggerKnownState).c_str());
+		}
+	}
+
+	if (triggerTransition && !isChainedOperation && transitionToAttempt != 0) {
+		std::shared_future<lifecycle_msgs::srv::ChangeState::Response::SharedPtr> futureResult = 
+			this->AsyncCallChangeState(this->mpLifecycleNodeNameToManage, transitionToAttempt);
+		this->EnqueueServiceResponseHandlerTask(this->mpLifecycleNodeNameToManage, futureResult, transitionToAttempt);
+	}
+
 	this->mpPreviousArmedStatus = currentArmed;
 	this->mpPreviousFlyingStatus = currentFlying;
 	RCLCPP_INFO(this->get_logger(), "--- Status Callback End (Msg #%d) ---", this->mpStatusMessageCounter);
