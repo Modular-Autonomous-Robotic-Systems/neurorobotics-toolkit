@@ -56,6 +56,21 @@ class LifecycleControllerBase : public rclcpp::Node, public std::enable_shared_f
 		std::shared_future<lifecycle_msgs::srv::GetState::Response::SharedPtr>
 		AsyncGetNodeState(const std::string& lifecycleNodeName);
 
+		/**
+		 * @brief Synchronously calls the change_state service for a managed node.
+		 * @param lifecycleNodeName The name of the node to call.
+		 * @param transitionId The ID of the transition to request.
+		 * @return bool: true if the service call completed AND the transition was successful, false otherwise.
+		 */
+		bool SyncCallChangeState(const std::string& lifecycleNodeName, uint8_t transitionId);
+
+		/**
+		 * @brief Synchronously calls the get_state service for a managed node.
+		 * @param lifecycleNodeName The name of the node to call.
+		 * @return uint8_t: The current state ID from the response, or PRIMARY_STATE_UNKNOWN on failure.
+		 */
+		lifecycle_msgs::msg::State SyncGetNodeState(const std::string& lifecycleNodeName);
+
 		void EnqueueServiceResponseHandlerTask(
 			const std::string& nodeName, // Used to lookup the registered callback
 			std::shared_future<lifecycle_msgs::srv::ChangeState::Response::SharedPtr> future,

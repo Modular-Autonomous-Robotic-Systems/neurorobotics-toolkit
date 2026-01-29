@@ -41,7 +41,7 @@ def generate_launch_description():
     delayed_launch.actions.append(airsim_node_launch)
 
     # --- ArduPilot SITL Launch ---
-    # Assuming workspace overlay of /ardupilot_ws
+    # Assuming workspace overlay of /ardu_ws
     ardupilot_sitl_pkg_path = launch_ros.substitutions.FindPackageShare('ardupilot_sitl')
     ardupilot_launch_file = launch.substitutions.PathJoinSubstitution([
         ardupilot_sitl_pkg_path,
@@ -98,6 +98,21 @@ def generate_launch_description():
     delayed_launch.actions.append(ardupilot_sitl_launch)
     
     sensors_pkg_path = launch_ros.substitutions.FindPackageShare('sensors')
+    encoder_launch_file = launch.substitutions.PathJoinSubstitution([
+        sensors_pkg_path,
+        'launch',
+        'ffmpeg_encode.launch.py'
+    ])
+    encoder_launch = launch.actions.IncludeLaunchDescription(
+        launch.launch_description_sources.PythonLaunchDescriptionSource(encoder_launch_file),
+        launch_arguments={
+            'input_topic': '/airsim_node/Copter/front_center_Scene/image',
+            'ffmpeg_topic': '/front_center_camera/compressed'}.items()
+    )
+    delayed_launch.actions.append(
+        launch.actions.LogInfo(msg="Launching ffmpeg_encoder after ardupilot_sitl")
+    )
+    delayed_launch.actions.append(encoder_launch)
     controllers_pkg_path = launch_ros.substitutions.FindPackageShare('controllers')
     
     all_supported_topics_list = [
@@ -105,7 +120,7 @@ def generate_launch_description():
         "/ap/geopose/filtered", "/ap/goal_lla", "/ap/gps_global_origin/filtered",
         "/ap/imu/experimental/data", "/ap/joy", "/ap/navsat", "/ap/pose/filtered",
         "/ap/status", "/ap/tf", "/ap/tf_static", "/ap/time", "/ap/twist/filtered",
-        "/airsim_node/Copter/front_center_Scene/image/ffmpeg"
+        "/front_center_camera/compressed"
     ]
     topics_str = f"[{', '.join([f'{repr(topic)}' for topic in all_supported_topics_list])}]"
     managed_logger_launch_file = launch.substitutions.PathJoinSubstitution([

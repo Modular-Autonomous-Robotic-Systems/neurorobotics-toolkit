@@ -16,7 +16,7 @@ def generate_launch_description():
     ap_type_arg = launch.actions.DeclareLaunchArgument(
         "ap_type",
         default_value="ArduPilot",
-        description="Autopilot type to log data for"
+        description="Autopilot type to log data for supported options are `ardupilot` and `tello`"
     )
     # Get LaunchConfiguration values to be used by nodes
     log_level = launch.substitutions.LaunchConfiguration("log_level")

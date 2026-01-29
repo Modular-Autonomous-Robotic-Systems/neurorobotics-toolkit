@@ -164,6 +164,81 @@ LifecycleControllerBase::AsyncGetNodeState(const std::string& lifecycleNodeName)
     return future_and_request_id.future.share();
 }
 
+bool LifecycleControllerBase::SyncCallChangeState(const std::string& lifecycleNodeName, uint8_t transitionId)
+{
+    RCLCPP_DEBUG(this->get_logger(), "SyncCallChangeState: Sending request for transition ID %d to node '%s'", transitionId, lifecycleNodeName.c_str());
+    std::shared_future<lifecycle_msgs::srv::ChangeState::Response::SharedPtr> future = this->AsyncCallChangeState(lifecycleNodeName, transitionId);
+
+    if (!future.valid()) {
+        RCLCPP_ERROR(this->get_logger(), "SyncCallChangeState: Failed to get valid future for node '%s'.", lifecycleNodeName.c_str());
+        return false;
+    }
+
+    std::future_status status = future.wait_for(this->mpWaitForServicesTimeoutMs);
+
+    if (status == std::future_status::ready) {
+        try {
+            lifecycle_msgs::srv::ChangeState::Response::SharedPtr response = future.get();
+            if (response && response->success) {
+                RCLCPP_DEBUG(this->get_logger(), "SyncCallChangeState: Received response for node '%s'. Transition success: true", lifecycleNodeName.c_str());
+                return true;
+            } else if (response) {
+                RCLCPP_WARN(this->get_logger(), "SyncCallChangeState: Received response for node '%s'. Transition success: false", lifecycleNodeName.c_str());
+                return false;
+            } else {
+                RCLCPP_ERROR(this->get_logger(), "SyncCallChangeState: Service call for node '%s' returned a null response.", lifecycleNodeName.c_str());
+                return false;
+            }
+        } catch (const std::exception& e) {
+            RCLCPP_ERROR(this->get_logger(), "SyncCallChangeState: Exception getting future result for '%s': %s", lifecycleNodeName.c_str(), e.what());
+            return false;
+        }
+    } else if (status == std::future_status::timeout) {
+        RCLCPP_WARN(this->get_logger(), "SyncCallChangeState: Timeout waiting for future for node '%s', transition '%s'",
+            lifecycleNodeName.c_str(), this->GetTransitionLabel(transitionId).c_str());
+        return false;
+    } else {
+        RCLCPP_ERROR(this->get_logger(), "SyncCallChangeState: Future for node '%s' deferred or error.", lifecycleNodeName.c_str());
+        return false;
+    }
+}
+
+lifecycle_msgs::msg::State LifecycleControllerBase::SyncGetNodeState(const std::string& lifecycleNodeName)
+{
+    RCLCPP_DEBUG(this->get_logger(), "SyncGetNodeState: Sending request to node '%s'", lifecycleNodeName.c_str());
+    std::shared_future<lifecycle_msgs::srv::GetState::Response::SharedPtr> future = this->AsyncGetNodeState(lifecycleNodeName);
+
+    if (!future.valid()) {
+        RCLCPP_ERROR(this->get_logger(), "SyncGetNodeState: Failed to get valid future for node '%s'.", lifecycleNodeName.c_str());
+        return lifecycle_msgs::msg::State::PRIMARY_STATE_UNKNOWN;
+    }
+
+    std::future_status status = future.wait_for(this->mpWaitForServicesTimeoutMs);
+
+    if (status == std::future_status::ready) {
+        try {
+            lifecycle_msgs::srv::GetState::Response::SharedPtr response = future.get();
+            if (response) {
+                RCLCPP_DEBUG(this->get_logger(), "SyncGetNodeState: Received response for node '%s'. State: %s", lifecycleNodeName.c_str(), this->GetStateLabel(response->current_state.id).c_str());
+                return response->current_state.id;
+            } else {
+                RCLCPP_ERROR(this->get_logger(), "SyncGetNodeState: Service call for node '%s' returned a null response.", lifecycleNodeName.c_str());
+                return lifecycle_msgs::msg::State::PRIMARY_STATE_UNKNOWN;
+            }
+        } catch (const std::exception& e) {
+            RCLCPP_ERROR(this->get_logger(), "SyncGetNodeState: Exception getting future result for '%s': %s", lifecycleNodeName.c_str(), e.what());
+            return lifecycle_msgs::msg::State::PRIMARY_STATE_UNKNOWN;
+        }
+    } else if (status == std::future_status::timeout) {
+        RCLCPP_WARN(this->get_logger(), "SyncGetNodeState: Timeout waiting for future for node '%s'",
+            lifecycleNodeName.c_str());
+        return lifecycle_msgs::msg::State::PRIMARY_STATE_UNKNOWN;
+    } else {
+        RCLCPP_ERROR(this->get_logger(), "SyncGetNodeState: Future for node '%s' deferred or error.", lifecycleNodeName.c_str());
+        return lifecycle_msgs::msg::State::PRIMARY_STATE_UNKNOWN;
+    }
+}
+
 void LifecycleControllerBase::EnqueueServiceResponseHandlerTask(
     const std::string& nodeName,
     std::shared_future<lifecycle_msgs::srv::ChangeState::Response::SharedPtr> future,
