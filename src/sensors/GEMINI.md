@@ -72,3 +72,7 @@ All commits affecting this package must follow the project-wide conventions:
 *   **Method References**: Always include the class name (e.g., `ManagedLoggerNode::on_configure`).
 *   **File Paths**: Use full relative paths (e.g., `src/sensors/launch/managed_logger.launch.py`).
 *   **Wrapping**: Wrap text at 72 characters.
+
+## Python Coding Standards
+
+This applies to all new python code. When writing Python code (especially launch files), only import top-level packages (e.g., `import launch`, `import launch_ros`, `import ament_index_python`) and use fully qualified module paths in the code instead of using `from ... import ...`. This helps make the code structure visible everywhere.

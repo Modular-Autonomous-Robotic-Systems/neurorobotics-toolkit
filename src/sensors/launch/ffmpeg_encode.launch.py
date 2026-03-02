@@ -58,12 +58,10 @@ def generate_launch_description():
                 # You can customize FFmpeg encoding parameters here.
                 # Find available encoders with: ffmpeg -codecs
                 # Find available presets with: ffmpeg -hide_banner -f lavfi -i nullsrc -c:v libx264 -preset help -f mp4 - 2>&1
-                "ffmpeg_image_transport.encoding": "libx264",
-                "ffmpeg_image_transport.profile": "main",
-                "ffmpeg_image_transport.preset": "ultrafast",  # Prioritize speed
-                "ffmpeg_image_transport.tune": "zerolatency",  # Good for live streaming
-                "ffmpeg_image_transport.gop_size": 15,  # Group of pictures size
-                "ffmpeg_image_transport.bit_rate": 1000000,  # In bits/s
+                "out.ffmpeg.encoder": "libx264",
+                "out.ffmpeg.bit_rate": 1000000,
+                "out.ffmpeg.gop_size": 15,
+                "out.ffmpeg.encoder_av_options": "preset:ultrafast,tune:zerolatency,profile:main",
             }
         ],
         output="screen",

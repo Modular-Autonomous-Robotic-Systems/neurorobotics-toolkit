@@ -5,17 +5,23 @@ import launch
 
 def generate_launch_description():
     log_level_arg = launch.actions.DeclareLaunchArgument(
-        "log_level",
+        "log-level",
         default_value="INFO",
         description="Logging level for the nodes (DEBUG, INFO, WARN, ERROR, FATAL)",
     )
-    log_level = launch.substitutions.LaunchConfiguration("log_level")
+    log_level = launch.substitutions.LaunchConfiguration("log-level")
     ns_arg = launch.actions.DeclareLaunchArgument(
-        "drone_name",
+        "drone-name",
         default_value="drone1",
         description="Name of the Tello drone for ID",
     )
-    ns = launch.substitutions.LaunchConfiguration("drone_name")
+    ns = launch.substitutions.LaunchConfiguration("drone-name")
+    use_joystick = launch.substitutions.LaunchConfiguration("use-joystick")
+    use_joystick_arg = launch.actions.DeclareLaunchArgument(
+        "use-joystick",
+        default_value="true",
+        description="Boolean Argument to Toggle the use of joystick to control tello drone",
+    )
     sensors_pkg_path = launch_ros.substitutions.FindPackageShare("sensors")
     encoder_launch_file = launch.substitutions.PathJoinSubstitution(
         [sensors_pkg_path, "launch", "ffmpeg_encode.launch.py"]
@@ -80,6 +86,7 @@ def generate_launch_description():
         [
             log_level_arg,
             ns_arg,
+            use_joystick_arg,
             # TelloControllerNode with remapped topics
             launch_ros.actions.Node(
                 package="controllers",
@@ -115,6 +122,9 @@ def generate_launch_description():
                 name="joy_node",
                 namespace=ns,
                 output="screen",
+                condition=launch.conditions.IfCondition(
+                    launch.substitutions.PythonExpression(["'", use_joystick, "'"])
+                ),
             ),
             launch_ros.actions.Node(
                 package="tello_driver",
