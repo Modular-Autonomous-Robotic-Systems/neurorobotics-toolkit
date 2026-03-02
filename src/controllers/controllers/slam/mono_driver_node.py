@@ -359,7 +359,7 @@ def main(args=None):
     except Exception as e:
         if mono_driver:
             mono_driver.get_logger().fatal(
-                f"Unhandled exception in main: {e}", exc_info=True
+                f"Unhandled exception in main: {e}",
             )
     finally:
         if executor:

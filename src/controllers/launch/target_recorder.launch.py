@@ -1,8 +1,7 @@
 import os
 
-import launch_ros
-
 import launch
+import launch_ros
 
 
 def generate_launch_description():
@@ -126,7 +125,6 @@ def generate_launch_description():
             "ros2",
             "topic",
             "pub",
-            "--once",
             "/video_logging_controller_node/start_logging",
             "std_msgs/msg/String",
             "{data: 'start'}",

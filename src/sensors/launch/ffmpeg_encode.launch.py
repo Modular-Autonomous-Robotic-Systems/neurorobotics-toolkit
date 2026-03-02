@@ -1,11 +1,11 @@
 import os
 
-from ament_index_python.packages import get_package_share_directory
-from launch_ros.actions import Node
+import ament_index_python.packages
 
-from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, LogInfo
-from launch.substitutions import LaunchConfiguration
+import launch_ros
+
+import launch
+import launch.substitutions
 
 
 def generate_launch_description():
@@ -21,33 +21,33 @@ def generate_launch_description():
     # --- Declare Launch Arguments ---
     # You can change these default values when you launch the file.
     # Example: ros2 launch your_package_name ffmpeg_republish_launch.py input_topic:=/my_camera/image_raw
-    input_topic_arg = DeclareLaunchArgument(
+    input_topic_arg = launch.actions.DeclareLaunchArgument(
         "input_topic",
         default_value="/camera/image_raw",
         description="The input topic for the raw image stream.",
     )
 
-    ffmpeg_topic_arg = DeclareLaunchArgument(
+    ffmpeg_topic_arg = launch.actions.DeclareLaunchArgument(
         "ffmpeg_topic",
         default_value="/camera/image_ffmpeg",
         description="The topic for the ffmpeg compressed stream.",
     )
 
-    node_name_arg = DeclareLaunchArgument(
+    node_name_arg = launch.actions.DeclareLaunchArgument(
         "ffmpeg_node_name",
         default_value="raw_to_ffmpeg_republisher",
         description="The name of the ffmpeg compressed",
     )
 
     # --- Get Launch Configurations ---
-    input_topic = LaunchConfiguration("input_topic")
-    ffmpeg_topic = LaunchConfiguration("ffmpeg_topic")
-    node_name = LaunchConfiguration("ffmpeg_node_name")
+    input_topic = launch.substitutions.LaunchConfiguration("input_topic")
+    ffmpeg_topic = launch.substitutions.LaunchConfiguration("ffmpeg_topic")
+    node_name = launch.substitutions.LaunchConfiguration("ffmpeg_node_name")
 
     # --- Nodes ---
 
     # 1. Republish node to compress the raw image stream into ffmpeg format.
-    raw_to_ffmpeg_node = Node(
+    raw_to_ffmpeg_node = launch_ros.actions.Node(
         package="image_transport",
         executable="republish",
         name=node_name,
@@ -67,13 +67,13 @@ def generate_launch_description():
         output="screen",
     )
 
-    return LaunchDescription(
+    return launch.LaunchDescription(
         [
             input_topic_arg,
             ffmpeg_topic_arg,
             node_name_arg,
-            LogInfo(msg=["Subscribing to raw images on topic: ", input_topic]),
-            LogInfo(msg=["Compressing to ffmpeg on topic: ", ffmpeg_topic]),
+            launch.actions.LogInfo(msg=["Subscribing to raw images on topic: ", input_topic]),
+            launch.actions.LogInfo(msg=["Compressing to ffmpeg on topic: ", ffmpeg_topic]),
             raw_to_ffmpeg_node,
         ]
     )
