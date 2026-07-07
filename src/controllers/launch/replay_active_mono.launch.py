@@ -33,20 +33,47 @@ def generate_launch_description():
     )
     controllers_pkg_path = get_package_share_directory("controllers")
     frontier_detection_path = get_package_share_directory("frontier_detection")
+    sensors_pkg_path = get_package_share_directory("sensors")
+
+    telemetry_path_arg = launch.actions.DeclareLaunchArgument(
+        "telemetry_path",
+        default_value="/ws/data/telemetry",
+        description="Path to the ros2 bag to replay",
+    )
+    telemetry_path = launch.substitutions.LaunchConfiguration("telemetry_path")
+
+    decoder_launch_file = launch.substitutions.PathJoinSubstitution(
+        [sensors_pkg_path, "launch", "ffmpeg_decode.launch.py"]
+    )
+    decoder_launch = launch.actions.IncludeLaunchDescription(
+        launch.launch_description_sources.PythonLaunchDescriptionSource(
+            decoder_launch_file
+        ),
+        launch_arguments={
+            "compressed_input_topic": launch.substitutions.PythonExpression(
+                ["'/' + ", "'", ns, "' + '/image_compressed'"]
+            ),
+            "raw_output_topic": launch.substitutions.PythonExpression(
+                ["'/' + ", "'", ns, "' + '/image_raw'"]
+            ),
+        }.items(),
+    )
+
+    bag_play = launch.actions.ExecuteProcess(
+        cmd=["ros2", "bag", "play", telemetry_path],
+        output="screen",
+    )
+
+    delayed_bag_play = launch.actions.TimerAction(
+        period=10.0,
+        actions=[bag_play],
+    )
+
     nodes = [
-        # Tello driver node
         logger_arg,
         ns_arg,
-        launch.actions.IncludeLaunchDescription(
-            launch.launch_description_sources.PythonLaunchDescriptionSource(
-                os.path.join(controllers_pkg_path, "launch/tello_controller.launch.py")
-            ),
-            launch_arguments=[
-                ("log_level", logger),
-                ("drone_name", ns),
-                ("use_joystick", "true"),
-            ],
-        ),
+        telemetry_path_arg,
+        decoder_launch,
         launch.actions.IncludeLaunchDescription(
             launch.launch_description_sources.PythonLaunchDescriptionSource(
                 os.path.join(controllers_pkg_path, "launch/slam_controller.launch.py")
@@ -75,6 +102,7 @@ def generate_launch_description():
             ),
             launch_arguments=[("log-level", logger)],
         ),
+        delayed_bag_play,
     ]
 
     return launch.LaunchDescription(nodes)
