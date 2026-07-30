@@ -1,19 +1,29 @@
 #!/usr/bin/env python3
 
-from controllers.slam.mono_driver_node import MonoDriver
 import rclpy
+from controllers.slam.mono_driver_node import MonoDriver
+from rclpy.executors import MultiThreadedExecutor
+
 
 def main():
+    driver = None
+    executor = None
     try:
         rclpy.init()
-        mono_driver = MonoDriver()
-        rclpy.spin(mono_driver)
-        mono_driver.destroy_node()
-        rclpy.shutdown()
+        driver = MonoDriver()
+        executor = MultiThreadedExecutor()
+        executor.add_node(driver)
+        executor.spin()
     except (KeyboardInterrupt, rclpy.executors.ExternalShutdownException):
-        rclpy.shutdown()
+        pass
+    finally:
+        if executor is not None:
+            executor.shutdown()
+        if driver is not None:
+            driver.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
