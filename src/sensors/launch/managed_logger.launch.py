@@ -1,10 +1,8 @@
 import os
 
 import ament_index_python.packages
-
-import launch_ros
-
 import launch
+import launch_ros
 
 
 def generate_launch_description():
@@ -22,6 +20,13 @@ def generate_launch_description():
         default_value="/ws/data/telemetry",
         description="Name of the output rosbag file.",
     )
+    use_sim_time_arg = launch.actions.DeclareLaunchArgument(
+        "use-sim-time",
+        default_value="False",
+        choices=["True", "False"],
+        description="Boolean, the only accepted values are True and False. Run the recorder on the simulator clock, so that bag receive timestamps and message header stamps share one domain and the bag replays coherently with --clock.",
+    )
+    use_sim_time = launch.substitutions.LaunchConfiguration("use-sim-time")
 
     # Define the list of all supported topics.
     all_supported_topics_list = [
@@ -75,6 +80,7 @@ def generate_launch_description():
                 "topics_to_record": launch.substitutions.LaunchConfiguration(
                     "topics_to_record"
                 ),
+                "use_sim_time": use_sim_time,
             }
         ],
     )
@@ -82,6 +88,7 @@ def generate_launch_description():
     ld = launch.LaunchDescription()
     ld.add_action(output_bag_name_arg)
     ld.add_action(topics_to_record_arg)
+    ld.add_action(use_sim_time_arg)
     ld.add_action(logger_node)
 
     return ld
