@@ -1,11 +1,12 @@
 #ifndef VIDEO_LOGGING_DRIVER_HPP_
 #define VIDEO_LOGGING_DRIVER_HPP_
 
+#include <memory>
+#include <string>
+
 #include "ardupilot_msgs/msg/status.hpp"
 #include "controllers/common/controller.h"
 #include "std_msgs/msg/string.hpp"
-#include <memory>
-#include <string>
 
 const std::string DRIVER_DEFAULT_LIFECYCLE_NODE_TO_MANAGE = "video_logger_test";
 const std::string DRIVER_DEFAULT_AP_STATUS_TOPIC = "/ap/status";
@@ -17,12 +18,12 @@ const std::string START_SUBSCRIBER_TOPIC_DEFAULT =
 const std::string STOP_SUBSCRIBER_TOPIC_DEFAULT = "/video_logging_driver/stop";
 
 class VideoLoggingDriver : public LifecycleControllerBase {
-  public:
+public:
     explicit VideoLoggingDriver(
-        const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
+        const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
     virtual ~VideoLoggingDriver();
 
-  private:
+private:
     std::string mpLifecycleNodeNameToManage;
     std::string mpAPStatusTopic;
     std::string mpAPType;
@@ -33,6 +34,10 @@ class VideoLoggingDriver : public LifecycleControllerBase {
     bool mpPreviousFlyingStatus = false;
     uint8_t mpVideoLoggerKnownState =
         lifecycle_msgs::msg::State::PRIMARY_STATE_UNKNOWN;
+    uint8_t mpTargetState = lifecycle_msgs::msg::State::PRIMARY_STATE_UNKNOWN;
+    // True between dispatching a transition and handling its response.
+    // Guards against a second status message dispatching a duplicate
+    bool mpTransitionInFlight = false;
     int mpStatusMessageCounter = 0;
 
     rclcpp::Subscription<ardupilot_msgs::msg::Status>::SharedPtr
@@ -42,8 +47,14 @@ class VideoLoggingDriver : public LifecycleControllerBase {
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr mpStartSubscriber;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr mpStopSubscriber;
 
+    rclcpp::TimerBase::SharedPtr mpInitialStateTimer;
+
     void InitializeDriverParameters();
     void SetupROSInterfaces();
+    void QueryInitialState();
+
+    void UpdateTargetState(bool currentArmed, bool currentFlying);
+    void Reconcile();
 
     void ArduPilotStatusCallback(
         const ardupilot_msgs::msg::Status::ConstSharedPtr msg);
@@ -56,13 +67,15 @@ class VideoLoggingDriver : public LifecycleControllerBase {
         lifecycle_msgs::srv::ChangeState::Response::ConstSharedPtr response);
 
     void OnVideoLoggerGetStateResponse(
-        const std::string &context, bool success,
+        const std::string& context, bool success,
         lifecycle_msgs::srv::GetState::Response::ConstSharedPtr response);
 
     void AttemptDriverSpecificGracefulShutdown();
 
-    std::mutex mpcVideoLoggerStateMutex;
-    std::mutex mpcStatusMutex;
+    // Guards mpPreviousArmedStatus, mpPreviousFlyingStatus,
+    // mpVideoLoggerKnownState, mpTargetState and mpTransitionInFlight as one
+    // unit.
+    std::mutex mpcStateMutex;
 };
 
-#endif // VIDEO_LOGGING_DRIVER_HPP_
+#endif  // VIDEO_LOGGING_DRIVER_HPP_

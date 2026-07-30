@@ -1,13 +1,12 @@
 import os
 
-import launch_ros
-
 import launch
+import launch_ros
 
 
 def generate_launch_description():
     log_level_arg = launch.actions.DeclareLaunchArgument(
-        "log_level",
+        "log-level",
         default_value="INFO",
         description="Logging level for the nodes (DEBUG, INFO, WARN, ERROR, FATAL)",
     )
@@ -18,11 +17,11 @@ def generate_launch_description():
     )
     ap_type_arg = launch.actions.DeclareLaunchArgument(
         "ap_type",
-        default_value="ArduPilot",
+        default_value="ardupilot",
         description="Autopilot type to log data for supported options are `ardupilot` and `tello`",
     )
     # Get LaunchConfiguration values to be used by nodes
-    log_level = launch.substitutions.LaunchConfiguration("log_level")
+    log_level = launch.substitutions.LaunchConfiguration("log-level")
     ap_status_topic_name = launch.substitutions.LaunchConfiguration(
         "ap_status_topic_name"
     )
@@ -34,6 +33,13 @@ def generate_launch_description():
         default_value="/ws/data/telemetry",
         description="Name of the output rosbag file. The output bag name must not contain special symbols and numbers.",
     )
+    use_sim_time_arg = launch.actions.DeclareLaunchArgument(
+        "use-sim-time",
+        default_value="False",
+        choices=["True", "False"],
+        description="Boolean, the only accepted values are True and False. Run the managed recorder on the simulator clock published on /clock.",
+    )
+    use_sim_time = launch.substitutions.LaunchConfiguration("use-sim-time")
 
     # Define the list of all supported topics.
     all_supported_topics_list = [
@@ -70,21 +76,6 @@ def generate_launch_description():
     )
 
     sensors_pkg_path = launch_ros.substitutions.FindPackageShare("sensors")
-    # encoder_launch_file = launch.substitutions.PathJoinSubstitution([
-    #     sensors_pkg_path,
-    #     'launch',
-    #     'ffmpeg_encode.launch.py'
-    # ])
-    # encoder_launch = launch.actions.IncludeLaunchDescription(
-    #     launch.launch_description_sources.PythonLaunchDescriptionSource(encoder_launch_file),
-    #     launch_arguments={
-    #         'input_topic': '/airsim_node/Copter/front_center_Scene/image',
-    #         'ffmpeg_topic': '/front_center_camera/compressed'}.items()
-    # )
-    # delayed_launch.actions.append(
-    #     launch.actions.LogInfo(msg="Launching ffmpeg_encoder after ardupilot_sitl")
-    # )
-    # delayed_launch.actions.append(encoder_launch)
 
     logger_launch_file = launch.substitutions.PathJoinSubstitution(
         [sensors_pkg_path, "launch", "managed_logger.launch.py"]
@@ -100,6 +91,7 @@ def generate_launch_description():
             "output_bag_name": launch.substitutions.LaunchConfiguration(
                 "output_bag_name"
             ),
+            "use-sim-time": use_sim_time,
         }.items(),
     )
 
@@ -121,32 +113,6 @@ def generate_launch_description():
         ],
     )
 
-    start_logging_pub = launch.actions.ExecuteProcess(
-        cmd=[
-            "ros2",
-            "topic",
-            "pub",
-            "--once",
-            "/video_logging_controller_node/start_logging",
-            "std_msgs/msg/String",
-            "{data: 'start'}",
-            "-1",
-        ],
-        output="screen",
-    )
-
-    delayed_start_logging = launch.actions.RegisterEventHandler(
-        launch.event_handlers.OnProcessStart(
-            target_action=video_logging_driver_node,
-            on_start=[
-                launch.actions.LogInfo(
-                    msg="Video Logging Controller started, publishing start signal..."
-                ),
-                start_logging_pub,
-            ],
-        )
-    )
-
     return launch.LaunchDescription(
         [
             log_level_arg,
@@ -154,8 +120,8 @@ def generate_launch_description():
             ap_type_arg,
             output_bag_name_arg,
             topics_to_record_arg,
+            use_sim_time_arg,
             logger_launch,
             video_logging_driver_node,
-            delayed_start_logging,
         ]
     )

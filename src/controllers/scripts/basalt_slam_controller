@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import rclpy
-from controllers.slam.mono_driver_node import MonoDriver
+from controllers.slam.basalt_driver_node import BasaltSLAMDriver
 from rclpy.executors import MultiThreadedExecutor
 
 
@@ -10,7 +10,7 @@ def main():
     executor = None
     try:
         rclpy.init()
-        driver = MonoDriver()
+        driver = BasaltSLAMDriver()
         executor = MultiThreadedExecutor()
         executor.add_node(driver)
         executor.spin()

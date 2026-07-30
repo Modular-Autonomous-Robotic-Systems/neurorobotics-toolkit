@@ -1,9 +1,8 @@
 import os
 
-import launch_ros
-from ament_index_python.packages import get_package_share_directory
-
+import ament_index_python.packages
 import launch
+import launch_ros
 
 
 def generate_launch_description():
@@ -31,8 +30,12 @@ def generate_launch_description():
             ["'/' + ", "'", ns, "' + '/tello_state'"]
         ),
     )
-    controllers_pkg_path = get_package_share_directory("controllers")
-    frontier_detection_path = get_package_share_directory("frontier_detection")
+    controllers_pkg_path = ament_index_python.packages.get_package_share_directory(
+        "controllers"
+    )
+    frontier_detection_path = ament_index_python.packages.get_package_share_directory(
+        "frontier_detection"
+    )
     nodes = [
         # Tello driver node
         logger_arg,
