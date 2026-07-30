@@ -1,0 +1,29 @@
+#!/usr/bin/env python3
+
+import rclpy
+from controllers.slam.basalt_driver_node import BasaltSLAMDriver
+from rclpy.executors import MultiThreadedExecutor
+
+
+def main():
+    driver = None
+    executor = None
+    try:
+        rclpy.init()
+        driver = BasaltSLAMDriver()
+        executor = MultiThreadedExecutor()
+        executor.add_node(driver)
+        executor.spin()
+    except (KeyboardInterrupt, rclpy.executors.ExternalShutdownException):
+        pass
+    finally:
+        if executor is not None:
+            executor.shutdown()
+        if driver is not None:
+            driver.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+
+
+if __name__ == "__main__":
+    main()

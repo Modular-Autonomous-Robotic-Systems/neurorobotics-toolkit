@@ -1,10 +1,3 @@
-[submodule "src/vision-opencv"]
-	path = src/vision-opencv
-	url = git@github.com:ros-perception/vision_opencv.git
-	branch = humble
-[submodule "src/ros2_shared"]
-	path = src/ros2_shared
-	url = git@github.com:shandilya1998/ros2_shared.git
 [submodule "src/tello"]
 	path = src/tello
 	url = git@github.com:shandilya1998/tello_ros.git
