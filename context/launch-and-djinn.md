@@ -1,6 +1,6 @@
 # Launch graph, arg propagation & djinn
 
-**Revised 2026-07-26**: `basalt_slam_test.launch.py` no longer includes `sitl.launch.py`. Supersedes the 2026-07-25 revision that documented argument forwarding between the two ([`/ws/plans/basalt-slam-defect-remediation.md`](../../plans/basalt-slam-defect-remediation.md) Change 3.4).
+`basalt_slam_test.launch.py` does not include `sitl.launch.py`, changed 2026-07-26. This file previously documented argument forwarding between the two, which described the tree as it stood on 2026-07-25 and no longer applies, the include having been deleted along with the forwarding ([`/ws/plans/basalt-slam-defect-remediation.md`](../../plans/basalt-slam-defect-remediation.md) Change 3.4).
 
 ## Two independent stacks
 
