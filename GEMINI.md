@@ -2,7 +2,7 @@
 
 ## Commit Message Conventions
 
-To maintain a clean and informative project history, all commits must adhere to the following strict guidelines.
+To maintain a clean and informative project history, all commits must adhere to the following strict guidelines. Furthermore, the commit message must be prompted to the user for validation before actually committing anything. Commit messages need to be derived from git diff and must list down all the changes in the diff, the rationale behind the changes and a high level description of the changes as explained below.
 
 ### Structure
 
@@ -39,7 +39,7 @@ All three sections carry numbered lists. Every entry is one number, even where a
 2.  **Content**:
     *   **Wrap at 72 characters**.
     *   **Numbered entries**: Every entry in every section is numbered. Continuation lines are indented to align under the text of their entry, which is three spaces for single digit numbers.
-    *   **Short sentences**: One claim per sentence. Split a compound sentence rather than joining it with a subordinate clause.
+    *   **Short sentences**: One claim per sentence. Split a compound sentence rather than joining it with a subordinate clause. Per point must be as few sentences as possible. Do not delve into details which are evident from the code. The commit message must provide a high level overview of the change made, files updated and a short rationale. Do not cross more than 12 words and 2 sentences per point
     *   **Backticks**: Every file path, class name, method name, member variable, type, macro, enumerator and build flag is wrapped in backticks. This covers prose in all three sections, not only the symbol being changed.
     *   **Method References**: Must include the class scope (e.g., `LifecycleControllerBase::SyncCallChangeState`).
     *   **Class References**: May be written with the `class` keyword where the class itself is the subject (e.g., `class BasaltSLAMNode`).
@@ -48,5 +48,5 @@ All three sections carry numbered lists. Every entry is one number, even where a
 
 3.  **Sections**:
     *   **Problem**: *What* is broken or missing and *why* it needs fixing.
-    *   **Solution**: *What* specific changes were made to address the problem. Each entry names the symbols introduced or modified and the file each one lives in.
+    *   **Solution**: *What* specific changes were made to address the problem and *why*. Each entry names the symbols introduced or modified and the file each one lives in followed by the reason for the changes made depicting the rationale or design decision here.
     *   **Note**: Deletions, side effects, or special instructions. Documentation updates, auto-formatting sweeps and known defects left standing belong here.
