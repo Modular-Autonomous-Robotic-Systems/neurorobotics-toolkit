@@ -10,7 +10,7 @@ enum class eSLAMAlgorithm { NOT_SET=-1, ORBSLAM3=0, BASALT=1 };  // line 120
 enum class eSLAMType { VSLAM=0, VISLAM=1 };                       // line 121
 class Imu   : public Data { Imu(ImuMsg::SharedPtr msg); ... toBasaltImuData(); };  // ~56
 class Frame : public Data { Frame(shared_ptr<cv::Mat>, long&); getImage(); };     // ~105
-class Slam { virtual TrackMonocular(...)=0; virtual TrackMonocularIMU(...); ... }; // ~123
+class Slam { virtual bool TrackMonocular(...)=0; virtual bool TrackMonocularIMU(...); ... }; // ~138
 ```
 
 ## Base lifecycle node — `src/slam/include/slam/node.hpp`
@@ -30,7 +30,7 @@ class SlamNode : public rclcpp_lifecycle::LifecycleNode {
 ```cpp
 class BasaltSLAM : public Slam {
   BasaltSLAM(logger, configFilePath, calibFilePath, setupCameraType);
-  void TrackMonocular(Frame&, Sophus::SE3f&) override;
+  bool TrackMonocular(Frame&, Sophus::SE3f&) override;   // true only when tcw was written
   void GrabIMU(std::shared_ptr<Imu>& data);   // pushes data->toBasaltImuData() to mpController->GrabIMU
   ...
   basalt::SlamMode mpSlamMode;  // enum class SlamMode { VO, VIO }; (controller.h:16)
@@ -62,3 +62,7 @@ The base call belongs at the **end** of `on_activate`, not the top, because the 
 `tf2_ros::TransformBroadcaster` is unaffected either way, because it creates a plain publisher through the node interfaces rather than a managed one, which is why the TF path always looked healthy.
 
 The member-type correction, declaring these members as `LifecyclePublisher<T>::SharedPtr`, is deliberately still deferred, so the activation change can be validated on its own first. See [`/ws/plans/slam-lifecycle-ap-status-reconciler.md`](../../plans/slam-lifecycle-ap-status-reconciler.md) §7 and §8.
+
+## Tracking return contract
+
+Since 2026-08-23 every `TrackMonocular` and `TrackMonocularIMU` in the hierarchy returns `bool` rather than `void`, `true` meaning the backend wrote a pose into the `tcw` out parameter and `false` meaning the frame was dropped or tracking failed, in which case `tcw` is untouched and must not be published. `BasaltSLAMNode::GrabImage` gates `mpTwc = tcw.inverse()` and `Update()` on this flag. `MonoORBSLAM3::TrackMonocular` derives the flag from `mpORBSlam3->GetTrackingState() == ORB_SLAM3::Tracking::OK`, so `RECENTLY_LOST` and the pre initialisation states report `false` even though ORB-SLAM3 returns an identity pose for them. `MonoMORBSLAM::TrackMonocular` reports whether `MORB_SLAM::MonoPacket::pose`, an `std::optional`, held a value, and writes `tcw` only in that case, which also removes an unconditional dereference of an empty optional. The base `Slam::TrackMonocularIMU` returns `false` after logging. `VisualSlamNode::GrabImage` (`src/slam/src/orbslam3/monocular.cpp:152`) still ignores the flag and publishes unconditionally, unlike `BasaltSLAMNode::GrabImage`, so the ORB-SLAM3 path can still broadcast a pose for an untracked frame. (Correction, 2026-08-23. The earlier `void` signature is recorded above as changed because it gave the caller no way to distinguish a tracked frame from a dropped one.)
